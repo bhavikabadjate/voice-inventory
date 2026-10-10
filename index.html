@@ -284,7 +284,7 @@ const W={SELL:K('becha bech bechi beche bechdiya sold sell vikla vikli vikle vik
  HISAB:K('hisaab hisab hishob kamai summary हिसाब हिशोब'),AAJ:K('aaj aj today आज'),BIKA:K('bika biki bikri sale sales kamaya बिका बिक्री'),REORDER:K('mangwana mangana mangvana mangao magvayche reorder order khatam मंगवाना मागवायचे'),
  ADVICE:K('salah salaah advice sujhav suggest suggestion tips badhaye badhayein badhaun badhana badhau improve grow सलाह सुझाव'),PROFIT:K('profit munafa kamai bikri business dhandha मुनाफा'),KAISE:K('kaise kese how कैसे'),
  MSG:K('message msg sandesh reminder offer status मैसेज संदेश'),HAFTA:K('hafte hafta week weekly saptah athavda athavdyacha हफ्ते आठवडा'),GADBAD:K('gadbad garbar gadbadi gadbadiya odd unusual audit jaanch chori गड़बड़ गडबड'),
- KSTOP:K('likho likh likhna daalo dalo daal isko iska yeh ye ne kiye kiya sabse zyada jyada kiska kiski dikhao batao par pe account bill ji wale wala ab tak se liye yancha yanchi yanchya khatyat liha taka cha chi che madhe ahe'),
+ KSTOP:K('likho likh likhna daalo dalo isko iska yeh ye ne kiye kiya sabse zyada jyada kiska kiski dikhao batao par pe account bill ji wale wala ab tak se liye yancha yanchi yanchya khatyat liha taka cha chi che madhe ahe'),
  STOP:K('ka ki ke hai hain mein me ko se liya aur and ani rs rupaye rupees rupay please the of much is what bhi item product kya total hua huwa per ek a for to in at de dena chahiye ahe che la update my mera of')};
 function lev(a,b){if(Math.abs(a.length-b.length)>1)return 2;const d=[...Array(b.length+1).keys()];
   for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
@@ -302,7 +302,10 @@ function tokenize(text){
 function nameIndex(){const m=new Map();for(const p of S.products)for(const n of [p.name,...(p.names||[])]){const k=key(n);if(!k)continue;
   if(!m.has(k))m.set(k,[]);m.get(k).push({id:p.id,k2:key2(n)})}return m}
 /* Finds products, quantities and units in a sentence. */
-function parseItems(toks){const idx=nameIndex(),items=[],used=new Set();let amb=null,cur={p:null,qty:null,unit:null};
+/* Words of every product name, so "potato chips" can find "Maxvita Potato Chips" and "Balaji Potato Chips". */
+function nameWords(){const out=[];for(const p of S.products)for(const n of [p.name,...(p.names||[])]){const w=String(n).split(/[\s\-]+/).filter(Boolean).map(x=>({k:key(x),k2:key2(x)})).filter(x=>x.k2);if(w.length>1)out.push({id:p.id,w})}return out}
+function parseItems(toks,adding){const idx=nameIndex(),words=nameWords(),items=[],used=new Set();
+  const partial=sl=>{const ids=new Set();for(const e of words)for(let a=0;a+sl.length<=e.w.length;a++)if(sl.every((x,j)=>x.k===e.w[a+j].k&&(x.k.length>=3||x.k2===e.w[a+j].k2))){ids.add(e.id);break}return ids};let amb=null,cur={p:null,qty:null,unit:null};
   const flush=()=>{if(cur.p)items.push(cur);else if(cur.qty!=null&&items.length&&items[items.length-1].qty==null){const l=items[items.length-1];l.qty=cur.qty;l.unit=cur.unit}
     else if(cur.qty!=null)items.loose=cur;cur={p:null,qty:null,unit:null}};
   for(let i=0;i<toks.length;i++){const t=toks[i];
@@ -311,9 +314,12 @@ function parseItems(toks){const idx=nameIndex(),items=[],used=new Set();let amb=
     if(t.unit){if(!cur.unit)cur.unit=t.unit;used.add(i);continue}
     let hit=null,n=0;
     for(n=3;n>=1&&!hit;n--){if(i+n>toks.length)continue;const sl=toks.slice(i,i+n),k=sl.map(x=>x.k).join(''),k2=sl.map(x=>x.k2).join('');
-      const m=(idx.get(k)||[]).filter(e=>k.length>=3||e.k2===k2);if(m.length){hit=new Set(m.map(e=>e.id));break}}
+      const m=(idx.get(k)||[]).filter(e=>k.length>=3||e.k2===k2);if(m.length){hit=new Set(m.map(e=>e.id));break}
+      /* No product has exactly this name: look for products whose name contains these words. A longer phrase wins over a shorter exact name. */
+      if(sl.some(x=>x.num!==undefined||x.unit||x.sep||Object.values(W).some(w=>inS(w,x)))||(n===1&&(adding||t.k.length<3)))continue;
+      const pm=partial(sl);if(pm.size){hit=pm;break}}
     if(!hit&&t.k.length>=4&&!Object.values(W).some(s=>inS(s,t))){for(const [k,es] of idx)if(k.length>=4&&lev(k,t.k)<=1){hit=new Set(es.map(e=>e.id));n=1;break}}
-    if(hit){if(hit.size>1){if(S.prefer&&hit.has(S.prefer))hit=new Set([S.prefer]);else amb=[...hit]}
+    if(hit){if(hit.size>1){const pf=S.prefers&&[...hit].find(id=>S.prefers.has(id));if(pf)hit=new Set([pf]);else if(!amb)amb=[...hit]}
       if(cur.p)flush();cur.p=S.products.find(p=>p.id===[...hit][0]);for(let j=i;j<i+n;j++)used.add(j);i+=n-1}}
   flush();return{items,amb,used,loose:items.loose}}
 function toBase(q,u,p){if(q==null)q=1;if(!u)return q;const b=p.unit;
@@ -496,7 +502,7 @@ function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,not
   if(store)outbox({t:'khata',row:{id:e.id,store_id:store.id,customer_id:c.id,amount_paise:Math.round(amount*100),note:e.note,created_at:new Date().toISOString()}});
   if(!noUndo)S.undo={what:tm('खात्याची नोंद','khata entry','the khata entry'),run:()=>addKhata(c,-amount,'undo',true)};renderKhata()}
 function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=numTok&&numTok.num;
-  const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
+  const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k2!=='dal'&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
   if(!nm){const l=S.customers.map(c=>[c,balance(c.id)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
     return say(l.length?tm('सर्वात जास्त बाकी:\n','Sabse zyada baki:\n','Most owed:\n')+l.slice(0,5).map(([c,b])=>`${c.name} ${fm(b)}`).join('\n')+`\n${tm('एकूण','Kul','Total')} ${fm(l.reduce((a,x)=>a+x[1],0))}`:tm('कोणाचीही बाकी नाही.','Kisi ka kuch baki nahi hai.','Nobody owes anything.'))}
   const c=findCustomer(nm),name=c?c.name:nm.replace(/(^|\s)\S/g,m=>m.toUpperCase()),pay=has(W.JAMA),useBill=num===undefined&&!has(W.KITNA)&&toks.some(x=>['isko','bill','yeh','ye','iska'].includes(x.k2));
@@ -752,8 +758,8 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
     if(text==='#merge'){const ps=ids.map(id=>S.products.find(p=>p.id===id)).filter(Boolean);if(ps.length>1){const a=ps[0];let n={...a,names:[...(a.names||[])]},q=a.qty;
         for(const b of ps.slice(1)){q+=b.qty;for(const nm of [b.name,...(b.names||[])])if(![n.name,...n.names].some(x=>key2(x)===key2(nm)))n.names.push(nm);deleteProduct(b.id)}
         n.qty=Math.round(q*1000)/1000;saveProduct(n);say(t(`${a.name} ek kar diya, stock ${fq(n.qty,n.unit)}.`,`Merged into one ${a.name}, stock ${fq(n.qty,n.unit)}.`))}}
-    else S.prefer=text.slice(6);
-    try{await handle(o,true)}finally{S.prefer=null}return}
+    else(S.prefers=S.prefers||new Set()).add(text.slice(6));
+    return handle(o,true)}
   if(text.startsWith('#nm:')){const o=S.nameOffer,p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;const pickd=text==='#nm:all'?o.list:[o.list[+text.slice(4)]].filter(Boolean);
     const add=pickd.filter(n=>![p.name,...(p.names||[])].some(x=>key2(x)===key2(n)));if(!add.length)return;saveProduct({...p,names:[...(p.names||[]),...add]},'set',true);
     return say(t(`${p.name} ke naam mein jud gaya: ${add.join(', ')}`,`Added to ${p.name}'s names: ${add.join(', ')}`))}
@@ -776,7 +782,7 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
   if(has(W.KHATA))return khataSay(toks,has);
   if(has(W.HISAB)||(has(W.AAJ)&&(has(W.SELL)||has(W.BIKA))))return hisaab();
   if(has(W.REORDER))return reorder();
-  const R=parseItems(toks),items=R.items;
+  const R=parseItems(toks,has(W.ADD)||has(W.COST)),items=R.items;if(!R.amb)S.prefers=null;
   if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id)).filter(Boolean),same=ps.every(p=>key(p.name)===key(ps[0].name));S.ambText=text;S.ambIds=ps.map(p=>p.id);
     const chips=ps.map(p=>[`${p.name} · ${fm(p.sell)} · ${fq(p.qty,p.unit)}`,'#pick:'+p.id]);if(same)chips.push([t('Ek hi cheez hai, mila do','Same item, merge them'),'#merge',1]);
     return say(same?t(`"${ps[0].name}" naam ke ${ps.length} product hain. Kaunsa?`,`There are ${ps.length} products named "${ps[0].name}". Which one?`):tm('कोणते?','Kaunsa?','Which one?'),chips)}
@@ -842,7 +848,7 @@ function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==
   if(toks.some(x=>x.k2==='cancel')){S.pending=null;say(tm('ठीक आहे, रद्द केले.','Theek hai, cancel.','Okay, cancelled.'));return true}
   if(a.type==='confirm'){if(yes){S.pending=null;a.run();return true}if(no){S.pending=null;say(tm('ठीक आहे, काही सेव्ह केले नाही.','Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}S.pending=null;return false}
   switch(a.step){
-    case'name':{const R2=parseItems(toks),it=R2.items[0],nm=toks.filter((x,i)=>!R2.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','KAR'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ');
+    case'name':{const R2=parseItems(toks,true),it=R2.items[0],nm=toks.filter((x,i)=>!R2.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','KAR'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ');
       if(it){a.p=it.p;a.exp=tracksExp(it.p)?undefined:null}else if(nm)a.name=nm;else{say(tm('वस्तूचे नाव सांगा.','Product ka naam batao.','Tell me the product name.'));return true}
       if(num!==undefined&&toks.find(x=>x.unit)){a.qty=num;a.unit=toks.find(x=>x.unit).unit}break}
     case'qty':if(num===undefined){say(tm('आकडा सांगा, उदा. 10 litre.','Number batao, jaise 10 litre.','Give a number, e.g. 10 litre.'));return true}a.qty=num;a.unit=(toks.find(x=>x.unit)||{}).unit||null;break;

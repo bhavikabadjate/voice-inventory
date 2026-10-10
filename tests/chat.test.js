@@ -81,13 +81,24 @@ const cases=[
  ['message: reminder uses the balance',[],['Ramesh ke khate mein 200 likho','haan','Ramesh ko reminder likho'],/Namaste Ramesh ji[\s\S]*₹200 baki/],
  ['message: reminder needs a customer',[],['reminder likho'],/Kis customer ko/],
  ['message: supplier order lists quantities',[],['sugar ka stock 3 kilo hai','haan','supplier ko order ka message likho'],/Sugar: 10 kg/],
+ ['variants: "potato chips" asks which of two',['chips','sales'],['potato chips'],/Kaunsa\?/,{bill:0}],
+ ['variants: picking one adds only that one',['chips','sales'],['potato chips','#pick:c2'],/1 packet Balaji Potato Chips jud gaya/,{bill:1}],
+ ['variants: plain "potato" is still the vegetable',['chips'],['potato kitne ka hai'],/Potato ₹30 per kg/],
+ ['variants: brand word alone finds the one product',['chips'],['maxvita kitne ka hai'],/Maxvita Potato Chips ₹10/],
+ ['variants: "chips" alone asks which',['chips'],['2 chips kitne ka'],/Kaunsa\?/],
+ ['variants: vegetable and chips in one bill',['chips','sales'],['1 kilo potato aur 2 balaji potato chips'],/Total ₹70/,{bill:2}],
+ ['variants: two unclear items are asked one after the other',['chips','dal','sales'],['potato chips aur 1 kilo dal','#pick:c1','#pick:d2'],/Total ₹130/,{bill:2}],
+ ['variants: a new product sharing a word can still be added',['dal'],['masoor dal add karo','5 kg','90','110','nahi','haan','masoor dal kitne ka hai'],/₹110 per kg/],
+ ['khata: "daal do" still works',['sales'],['2 kilo cheeni','isko Ramesh ke khate mein daal do','haan'],/Ramesh ka ab ₹88 baki/,{khata:1}],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`
 (async()=>{let fail=0;
 for(const [name,flags,says,want,end] of cases){
   S.products=flags.includes('empty')?[]:shop();if(flags.includes('dup'))S.products.push({id:'m2',name:'milk',names:[],unit:'L',qty:3,cost:null,sell:56,low:0});
-  S.sales=[];S.moves=[];S.customers=[];S.khata=[];S.lastSale=null;S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang=flags.includes('mr')?'mr':'hi';if(flags.includes('exp')){const d=new Date(Date.now()+2*864e5).toISOString().slice(0,10);S.products[0].batches=[{qty:5,exp:d},{qty:15,exp:''}];S.products[0].expiry=d}mode=flags.includes('sales')?'sales':'talk';log.length=0;
+  if(flags.includes('chips'))S.products.push({id:'pot',name:'Potato',names:['aloo','batata'],unit:'kg',qty:20,cost:22,sell:30,low:5},{id:'c1',name:'Maxvita Potato Chips',names:[],unit:'packet',qty:20,cost:8,sell:10,low:0},{id:'c2',name:'Balaji Potato Chips',names:[],unit:'packet',qty:20,cost:16,sell:20,low:0});
+  if(flags.includes('dal'))S.products.push({id:'d1',name:'Toor Dal',names:[],unit:'kg',qty:20,cost:128,sell:145,low:0},{id:'d2',name:'Moong Dal',names:[],unit:'kg',qty:20,cost:105,sell:120,low:0});
+  S.prefers=null;S.sales=[];S.moves=[];S.customers=[];S.khata=[];S.lastSale=null;S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang=flags.includes('mr')?'mr':'hi';if(flags.includes('exp')){const d=new Date(Date.now()+2*864e5).toISOString().slice(0,10);S.products[0].batches=[{qty:5,exp:d},{qty:15,exp:''}];S.products[0].expiry=d}mode=flags.includes('sales')?'sales':'talk';log.length=0;
   if(flags.includes('voiceadd')){S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};advanceAdd()}
   if(flags.includes('samples'))loadSamples();
   for(const m of says){await handle(m);await new Promise(r=>setTimeout(r,5))}
