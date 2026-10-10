@@ -2,7 +2,9 @@
 // Usage: node tests/chat.test.js   (no dependencies)
 const fs=require('fs'),path=require('path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-const src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];
+let src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];
+/* The cases are written against the Roman wording of the Hindi replies; hinglish.json maps each Devanagari string in the page back to it. */
+for(const [d,r] of JSON.parse(fs.readFileSync(path.join(__dirname,'hinglish.json'),'utf8')).sort((a,b)=>b[0].length-a[0].length))src=src.split(d).join(r);
 const els={};const mk=()=>({hidden:false,checked:false,value:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){}},append(){},focus(){},setAttribute(){},abort(){},blur(){},contains(){return false},querySelectorAll(){return[]},closest(){return mk()},set innerHTML(v){}});
 global.document={getElementById:id=>els[id]||(els[id]=mk()),createElement:()=>mk(),querySelectorAll:()=>[],head:mk(),addEventListener(){},documentElement:{}};
 global.window={addEventListener(){}};global.localStorage={getItem(){return null},setItem(){}};global.location={protocol:'file:'};
@@ -146,7 +148,7 @@ for(const [name,flags,says,want,end] of cases){
   for(const m of says){await handle(m);await new Promise(r=>setTimeout(r,5))}
   /* names and units are shown in the chosen language; the cases below are written with the stored English names */
   const back=[];for(const k in PNAMES){const e=S.products.map(p=>p.name).concat(['Sugar','Milk','Toor Dal','Moong Dal','Parle-G','Rice','Atta','Potato','Onion','Curd','Paneer','Bread','Eggs','Tea','Salt','Soap','Ghee','Besan','Maggi','Sunflower Oil','Haldi','Ragi','Dal']).find(n=>n.toLowerCase().replace(/[^a-z]/g,'')===k);if(e){back.push([PNAMES[k].hi,e]);back.push([PNAMES[k].mr,e])}}
-  back.sort((a,b)=>b[0].length-a[0].length);const un=s=>{for(const [f,e] of back)if(f!==e)s=s.split(f).join(e);return s.split('लिटर').join('litre').split('किलो').join('kg').split('पॅकेट').join('packet').split('नग').join('piece').split(' kilo').join(' kg')};
+  back.sort((a,b)=>b[0].length-a[0].length);const un=s=>{for(const [f,e] of back)if(f!==e)s=s.split(f).join(e);return s.split('लीटर').join('litre').split('पैकेट').join('packet').split('पीस').join('piece').split('ग्राम').join('gram').split('लिटर').join('litre').split('किलो').join('kg').split('पॅकेट').join('packet').split('नग').join('piece').split(' kilo').join(' kg')};
   const all=un(log.join(' | ')),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
   if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:k==='khata'?S.khata.length===end[k]:k==='batches'?(S.products.find(p=>p.id==='milk').batches||[]).length===end[k]:q(k)===end[k]);
   if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length,khata:S.khata.length}):'')}

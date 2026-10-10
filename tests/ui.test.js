@@ -13,14 +13,14 @@ await pg.fill('#say','sab ka stock');await pg.click('#composer button');ok('a li
 await pg.fill('#say','cheeni ka rate 46 karo');await pg.click('#composer button');ok('yes and no are pinned above the mic',await ev(()=>document.querySelectorAll('#pend button').length===2&&!document.querySelector('.msg.latest .chips')));
 await pg.click('#pend button');ok('tapping the pinned yes saves and clears the buttons',await ev(()=>S.products.find(p=>p.name==='Sugar').sell===46&&!document.querySelector('#pend button')));
 await pg.fill('#say','cheeni ka rate 44 karo');await pg.click('#composer button');await pg.click('#pend button');
-await pg.fill('#say','besan add karo');await pg.click('#composer button');ok('an add question shows a pinned Cancel',await ev(()=>[...document.querySelectorAll('#pend button')].some(b=>/Chhodo|Cancel/.test(b.textContent))));await pg.click('#pend button');ok('pinned Cancel stops the add',await ev(()=>!S.pending));
+await pg.fill('#say','besan add karo');await pg.click('#composer button');ok('an add question shows a pinned Cancel',await ev(()=>[...document.querySelectorAll('#pend button')].some(b=>/Chhodo|छोड़ो|Cancel/.test(b.textContent))));await pg.click('#pend button');ok('pinned Cancel stops the add',await ev(()=>!S.pending));
 await over('ask 360x640');
 // --- stock form
 await pg.click('[data-tab=stock]');await over('stock');
 await pg.click('#newBtn');await pg.fill('#f-name','<img src=x onerror=window.__x=1> Very Long Product Name That Goes On And On For Testing Layout');await pg.fill('#f-sell','25');await pg.fill('#f-qty','3');await pg.click('#edit button[type=submit]');
 ok('html in a name is shown as text, not run',await ev(()=>!window.__x&&[...document.querySelectorAll('#stockList b')].some(x=>x.textContent.includes('<img'))));await over('stock with a very long name');
 await pg.click('#newBtn');await pg.fill('#f-name','Milk');await pg.fill('#f-sell','60');await pg.click('#edit button[type=submit]');
-ok('adding an existing name opens the existing product',await ev(()=>S.products.filter(p=>p.name==='Milk').length===1&&/already exists|pehle se hai/.test(document.getElementById('alerts').textContent)),await ev(()=>document.getElementById('alerts').textContent));
+ok('adding an existing name opens the existing product',await ev(()=>S.products.filter(p=>p.name==='Milk').length===1&&/already exists|pehle se hai|पहले से है/.test(document.getElementById('alerts').textContent)),await ev(()=>document.getElementById('alerts').textContent));
 await pg.click('#f-cancel');
 await pg.click('#newBtn');await pg.fill('#f-name','Negative Test');await pg.fill('#f-sell','-5').catch(()=>{});await pg.fill('#f-qty','-3').catch(()=>{});await pg.click('#edit button[type=submit]');
 ok('negative price or quantity is not saved',await ev(()=>!S.products.some(p=>p.sell<0||p.qty<0)),await ev(()=>S.products.filter(p=>p.sell<0||p.qty<0)));
@@ -30,8 +30,8 @@ await pg.click('#newBtn');await pg.fill('#f-name','');await pg.click('#edit butt
 await ev(()=>openEdit(S.products.find(p=>p.name==='Sugar')));await pg.fill('#f-qty','20');await pg.fill('#f-exp','2026-12-01');await pg.click('#edit button[type=submit]');
 ok('editing quantity logs a stock change and keeps batches',await ev(()=>{const p=S.products.find(p=>p.name==='Sugar');return p.qty===20&&p.batches.length>=1&&S.moves[0].name==='Sugar'}),await ev(()=>S.products.find(p=>p.name==='Sugar')));
 const n0=await ev(()=>S.products.length);await ev(()=>openEdit(S.products.find(p=>p.name==='Haldi')));await pg.click('#f-del');ok('one tap on Delete does not delete',await ev(()=>S.products.some(p=>p.name==='Haldi')));await pg.click('#f-del');ok('second tap deletes',await ev(()=>!S.products.some(p=>p.name==='Haldi')));
-await pg.fill('#stockQ','dudh');ok('search by another name finds the product',await ev(()=>{const r=[...document.querySelectorAll('#stockList .item b')].map(x=>x.textContent);return r.length===1&&(r[0]==='Milk'||r[0]==='Doodh')}),await ev(()=>[...document.querySelectorAll('#stockList .item b')].map(x=>x.textContent)));
-await pg.fill('#stockQ','xyqp');ok('search with no match says so',await ev(()=>/Kuch nahi mila|Nothing matches/.test(document.getElementById('stockList').textContent)));await pg.fill('#stockQ','');
+await pg.fill('#stockQ','dudh');ok('search by another name finds the product',await ev(()=>{const r=[...document.querySelectorAll('#stockList .item b')].map(x=>x.textContent);return r.length===1&&(r[0]==='Milk'||r[0]==='दूध')}),await ev(()=>[...document.querySelectorAll('#stockList .item b')].map(x=>x.textContent)));
+await pg.fill('#stockQ','xyqp');ok('search with no match says so',await ev(()=>/Kuch nahi mila|कुछ नहीं मिला|Nothing matches/.test(document.getElementById('stockList').textContent)));await pg.fill('#stockQ','');
 await pg.click('#stockF [data-f=low]');ok('Low filter shows only low items',await ev(()=>{const n=document.querySelectorAll('#stockList .item').length;return n>0&&n===S.products.filter(p=>p.low&&p.qty<=p.low).length}));await pg.click('#stockF [data-f=all]');
 // --- sell
 await pg.click('[data-tab=sales]');await over('sell empty');const PG='#quick .qt:has-text("Parle-G")';await pg.click(PG);await pg.click(PG);ok('tapping an item twice makes quantity 2',await ev(()=>S.bill.length===1&&S.bill[0].qty===2),await ev(()=>S.bill));
@@ -46,10 +46,10 @@ ok('tapping Undo puts the stock back',await ev(()=>S.products.find(p=>p.name==='
 await pg.fill('#say','2 kilo cheeni, 1 litre dudh');await pg.click('#composer button');await pg.click('#b-ok');await pg.waitForTimeout(500);
 await pg.fill('#p-cust','Test Customer');await pg.click('#p-khata');ok('bill moved to khata',await ev(()=>S.customers.length===1&&balance(S.customers[0].id)===144));
 // --- khata
-await pg.click('[data-tab=khata]');await over('khata');await pg.click('#k-form button[type=submit]');ok('empty khata form is refused',await ev(()=>S.khata.length>=1&&/dono|both/.test(document.getElementById('k-msg').textContent)));
+await pg.click('[data-tab=khata]');await over('khata');await pg.click('#k-form button[type=submit]');ok('empty khata form is refused',await ev(()=>S.khata.length>=1&&/dono|दोनों|both/.test(document.getElementById('k-msg').textContent)));
 await pg.fill('#k-name','Asha');await pg.fill('#k-amt','100');await pg.fill('#k-phone','12345');await pg.click('#k-form button[type=submit]');ok('bad phone is refused',await ev(()=>!S.customers.some(c=>c.name==='Asha')));
 await pg.fill('#k-phone','9123456780');await pg.click('#k-form button[type=submit]');ok('good phone is saved with +91',await ev(()=>(S.customers.find(c=>c.name==='Asha')||{}).phone==='919123456780'));
-await pg.fill('#k-name','Asha');await pg.fill('#k-amt','150');await pg.click('#k-paid');ok('paying more than owed shows an advance, not a negative debt',await ev(()=>/advance|jama/.test(document.getElementById('khataList').textContent)),await ev(()=>document.getElementById('khataList').textContent.slice(0,120)));
+await pg.fill('#k-name','Asha');await pg.fill('#k-amt','150');await pg.click('#k-paid');ok('paying more than owed shows an advance, not a negative debt',await ev(()=>/advance|jama|जमा/.test(document.getElementById('khataList').textContent)),await ev(()=>document.getElementById('khataList').textContent.slice(0,120)));
 // --- shop
 await pg.click('[data-tab=shop]');await over('shop');await pg.fill('#i-name','Test Kirana');await pg.fill('#i-upi','not a upi');await pg.click('#i-form button[type=submit]');ok('bad UPI ID is refused',await ev(()=>!S.shop.upi));
 await pg.fill('#i-upi','test@okaxis');await pg.click('#i-form button[type=submit]');ok('good UPI ID is saved',await ev(()=>S.shop.upi==='test@okaxis'));

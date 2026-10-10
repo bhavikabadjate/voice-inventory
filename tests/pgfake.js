@@ -75,7 +75,8 @@ async function makeBackend({migrations=['1_shop_sync.sql','2_khata.sql','3_produ
 
 /* One phone: the page's script running with its own storage. reload() opens the page again on the same storage. */
 const SRC=(()=>{const html=fs.readFileSync(process.env.SITE||path.join(__dirname,'..','index.html'),'utf8');
-  return html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1].replace("function say(text,chips,spoken){","function say(text,chips,spoken){__log.push(text);return;").replace("function me(text){","function me(text){return;")+"\n;if(typeof runDbCheck==='undefined')globalThis.runDbCheck=async()=>[];"})();   /* the last part lets this suite run against older builds: SITE=old.html node tests/db.test.js */
+  let src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];try{for(const [d,r] of JSON.parse(fs.readFileSync(path.join(__dirname,'hinglish.json'),'utf8')).sort((a,b)=>b[0].length-a[0].length))src=src.split(d).join(r)}catch(e){}
+  return src.replace("function say(text,chips,spoken){","function say(text,chips,spoken){__log.push(text);return;").replace("function me(text){","function me(text){return;")+"\n;if(typeof runDbCheck==='undefined')globalThis.runDbCheck=async()=>[];"})();   /* the last part lets this suite run against older builds: SITE=old.html node tests/db.test.js */
 class Phone{
   constructor(backend,ls,net,claude){this.backend=backend;this.ls=ls||{};this.net=net||{};this.claude=claude;const els=this.els={},self=this;
     const mk=()=>({hidden:false,checked:false,disabled:false,value:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){},toggle(){}},append(){},insertAdjacentHTML(){},focus(){},setAttribute(){},abort(){},blur(){},contains(){return false},querySelectorAll(){return[]},closest(){return mk()},set innerHTML(v){},get innerHTML(){return''}});

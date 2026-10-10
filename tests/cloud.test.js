@@ -2,7 +2,9 @@
 // Usage: node tests/cloud.test.js   (no dependencies)
 const fs=require('fs'),path=require('path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-const src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];
+let src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];
+/* The cases are written against the Roman wording of the Hindi replies; hinglish.json maps each Devanagari string in the page back to it. */
+for(const [d,r] of JSON.parse(fs.readFileSync(path.join(__dirname,'hinglish.json'),'utf8')).sort((a,b)=>b[0].length-a[0].length))src=src.split(d).join(r);
 const els={};const mk=()=>({hidden:false,checked:false,value:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){},toggle(){}},append(){},focus(){},setAttribute(){},abort(){},blur(){},contains(){return false},querySelectorAll(){return[]},closest(){return mk()},set innerHTML(v){}});
 global.document={getElementById:id=>els[id]||(els[id]=mk()),createElement:()=>mk(),querySelectorAll:()=>[],head:mk(),addEventListener(){},documentElement:{}};
 const store0={};global.localStorage={getItem:k=>k in store0?store0[k]:null,setItem:(k,v)=>{store0[k]=String(v)},removeItem:k=>{delete store0[k]}};
