@@ -496,10 +496,31 @@ async function runOp(o){const once={ignoreDuplicates:true};
   else if(o.t==='move')ck(await sb.from('stock_moves').upsert(o.row,once));
   else if(o.t==='sales')ck(await sb.from('sales').upsert(o.rows,once));
   else if(o.t==='del')ck(await sb.from('products').update({deleted:true}).eq('id',o.id));
-  else if(o.t==='cust')ck(await sb.from('customers').upsert(o.row));
-  else if(o.t==='khata')ck(await sb.from('khata_entries').upsert(o.row,once));
+  else if(o.t==='cust'){ck(await sb.from('customers').upsert(o.row));const c=S.customers.find(x=>x.id===o.row.id);if(c)delete c.u}
+  else if(o.t==='khata'){ck(await sb.from('khata_entries').upsert(o.row,once));const e=S.khata.find(x=>x.id===o.row.id);if(e)delete e.u}
   else if(o.t==='store')ck(await sb.from('stores').update(o.row).eq('id',o.id))}
-async function flush(){while(OB.length){try{await runOp(OB[0])}catch(e){if(transient(e))throw e;$('shopMsg').textContent='One change was refused by the cloud and dropped: '+(e.message||e)}OB.shift();saveOB()}}
+const KHATA_LOCAL=()=>t('Khata abhi sirf is phone par save hai: cloud mein khata ki table nahi mili. Supabase mein khata wali migration chalao, phir yeh apne aap sync ho jayega.','Khata is saved on this phone only for now: the cloud has no khata tables. Run the khata migration in Supabase and it will sync by itself.');
+async function flush(){while(OB.length){const o=OB[0];try{await runOp(o)}catch(e){if(transient(e))throw e;const txt=(e.code||'')+' '+(e.message||e);
+      if(o.t==='cust'||o.t==='khata'){
+        /* The cloud has no khata tables: keep every entry on the phone, marked as not yet sent, and stop trying until the tables appear. */
+        if(/42P01|PGRST205|schema cache|does not exist/i.test(txt)){S.khataCloud=false;OB=OB.filter(x=>x.t!=='cust'&&x.t!=='khata');saveOB();persist();$('shopMsg').textContent=KHATA_LOCAL();continue}
+        const ent=(o.t==='cust'?S.customers:S.khata).find(x=>x.id===o.row.id);if(ent)ent.bad=1}
+      $('shopMsg').textContent='One change was refused by the cloud and dropped: '+(e.message||e)}
+    OB.shift();saveOB()}persist()}
+/* Queue every khata customer and entry that has not reached the cloud yet. Safe to call any time. */
+function khataPush(){if(!store||S.khataCloud===false){persist();return}
+  const ops=OB.filter(o=>o.t==='cust'||o.t==='khata'),queued=new Set(ops.map(o=>o.row.id)),sid=store.id;let n=0;
+  S.customers.filter(c=>c.u&&!c.bad).forEach(c=>{const row={id:c.id,store_id:sid,name:c.name,phone:c.phone||'',deleted:false},q=ops.find(o=>o.t==='cust'&&o.row.id===c.id);if(q)q.row=row;else{OB.push({t:'cust',row});n++}});
+  S.khata.filter(e=>e.u&&!e.bad&&!queued.has(e.id)).sort((a,b)=>a.at-b.at).forEach(e=>{OB.push({t:'khata',row:{id:e.id,store_id:sid,customer_id:e.cid,amount_paise:Math.round(e.amount*100),note:e.note||'',created_at:new Date(e.at).toISOString()}});n++});
+  saveOB();persist();if(n||OB.length)enqueue(flush)}
+/* The first time this phone joins a shop, bring along the khata and UPI ID it already had, so signing in never loses them. */
+const DEMO=['Ramesh Patil','Sunita Joshi','Imran Shaikh','Lata Kulkarni'].map(key2);
+function adoptLocal(){try{const k='adopted:'+store.id;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');const d=JSON.parse(localStorage.getItem('shop')||'null');if(!d)return;
+    const mine=(d.customers||[]).filter(c=>c.phone||!DEMO.includes(key2(c.name))),ids=new Set(mine.map(c=>c.id));
+    mine.forEach(c=>{const have=S.customers.find(x=>x.id===c.id);if(have)have.u=1;else S.customers.push({...c,u:1})});
+    (d.khata||[]).filter(e=>ids.has(e.cid)).forEach(e=>{const have=S.khata.find(x=>x.id===e.id);if(have)have.u=1;else S.khata.push({...e,u:1})});S.khata.sort((a,b)=>b.at-a.at);
+    if(member.role==='owner'&&!store.upi_id&&d.shop&&d.shop.upi)saveShop({name:store.name||d.shop.name||'',upi:d.shop.upi});
+  }catch(e){}}
 async function sync(){await flush();
   /* Pick up permission changes the owner made, and notice if this person was removed. */
   if(store&&session){const me=ck(await sb.from('members').select('store_id,role,name,can_see_cost,can_delete').eq('store_id',store.id).eq('user_id',session.user.id).maybeSingle());
@@ -521,9 +542,14 @@ function cloudSave(p,old,reason){const sid=store.id;
   if(delta)outbox({t:'move',row:{id:nid('m'),store_id:sid,product_id:p.id,delta,reason:old?reason:'create',created_at:new Date().toISOString()}})}
 async function allRows(table,cols){let out=[],from=0;for(;;){const d=ck(await sb.from(table).select(cols).eq('store_id',store.id).order(table==='product_costs'?'product_id':'id').range(from,from+999));out=out.concat(d);if(d.length<1000)break;from+=1000}return out}
 async function pull(){if(!store||OB.length)return;
-  const [ps,cs,ms,ss,cu,kh]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta,reason,created_at'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at'),allRows('customers','id,name,phone,deleted').catch(()=>[]),allRows('khata_entries','id,customer_id,amount_paise,note,created_at').catch(()=>[])]);
+  const [ps,cs,ms,ss,cu,kh]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta,reason,created_at'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at'),allRows('customers','id,name,phone,deleted').catch(e=>{if(transient(e))throw e;return null}),allRows('khata_entries','id,customer_id,amount_paise,note,created_at').catch(e=>{if(transient(e))throw e;return null})]);
   if(OB.length)return;
-  S.customers=cu.filter(c=>!c.deleted).map(c=>({id:c.id,name:c.name,phone:c.phone||''}));S.khata=kh.map(k=>({id:k.id,cid:k.customer_id,amount:k.amount_paise/100,note:k.note||'',at:+new Date(k.created_at)})).sort((a,b)=>b.at-a.at);
+  if(!cu||!kh){S.khataCloud=false;if($('shopMsg')&&S.khata.length)$('shopMsg').textContent=KHATA_LOCAL()}   /* cloud khata unreadable: leave the phone's khata exactly as it is */
+  else{S.khataCloud=true;const cid=new Set(cu.map(c=>c.id)),kid=new Set(kh.map(k=>k.id)),mineC=S.customers.filter(c=>c.u),mineK=S.khata.filter(e=>e.u&&!kid.has(e.id));
+    /* cloud rows, plus anything made on this phone that has not been sent yet */
+    S.customers=[...cu.filter(c=>!c.deleted).map(c=>mineC.find(x=>x.id===c.id)||{id:c.id,name:c.name,phone:c.phone||''}),...mineC.filter(c=>!cid.has(c.id))];
+    S.khata=[...kh.map(k=>({id:k.id,cid:k.customer_id,amount:k.amount_paise/100,note:k.note||'',at:+new Date(k.created_at)})),...mineK].sort((a,b)=>b.at-a.at);
+    if(mineC.length||mineK.length)setTimeout(khataPush,0)}
   const q={},cost={},byId={};ms.forEach(m=>q[m.product_id]=(q[m.product_id]||0)+m.delta);cs.forEach(c=>cost[c.product_id]=c.cost_paise/100);
   const conv=p=>({id:p.id,name:(p.names&&p.names[0])||'?',names:(p.names||[]).slice(1),unit:R2U[p.unit]||'pc',runit:p.unit,sell:p.sell_paise/100,cost:cost[p.id]??null,qty:Math.round((q[p.id]||0)*1000)/1000,low:p.low_stock_at||0,expiry:p.expiry||'',batches:Array.isArray(p.batches)?p.batches:undefined});
   if(ps.length)S.hasBatchCol='batches' in ps[0];
@@ -534,7 +560,10 @@ async function pull(){if(!store||OB.length)return;
   S.sales=[...bills.values()].map(b=>({items:b.items,total:Math.round(b.paise/100),at:b.at})).sort((a,b)=>b.at-a.at);renderAll();persist()}
 async function findStore(){session=(await sb.auth.getSession()).data.session;store=null;member=null;if(!session)return;
   try{const ms=ck(await sb.from('members').select('store_id,role,name,can_see_cost,can_delete').eq('user_id',session.user.id).limit(1));if(!ms.length)return;
-    member=ms[0];store=ck(await sb.from('stores').select('id,name,code,upi_id').eq('id',member.store_id).single());S.shop={name:store.name||'',upi:store.upi_id||''}}
+    member=ms[0];store=ck(await sb.from('stores').select('id,name,code,upi_id').eq('id',member.store_id).single());S.shop={name:store.name||'',upi:store.upi_id||''};
+    /* khata that only this phone holds lives in its saved copy of the shop; start from that, then merge with the cloud */
+    try{const c=JSON.parse(localStorage.getItem('cloudcache')||'null');if(c&&c.store&&c.store.id===store.id&&!S.seeded){S.customers=c.customers||[];S.khata=c.khata||[];S.seeded=1}}catch(e){}
+    adoptLocal()}
   catch(e){if(!transient(e))throw e;let c=null;try{c=JSON.parse(localStorage.getItem('cloudcache')||'null')}catch(x){}
     if(!c||!c.store)throw e;store=c.store;member=c.member;restore(c);renderAll();$('status').textContent='Offline'}
   $('costOn').closest('label').hidden=!canCost();if(!canCost()){$('costOn').checked=false}
@@ -609,12 +638,12 @@ const balance=cid=>Math.round(S.khata.filter(e=>e.cid===cid).reduce((a,e)=>a+e.a
 function findCustomer(name){const k=key2(name),kk=key(name);return S.customers.find(c=>key2(c.name)===k)||S.customers.find(c=>kk.length>=4&&lev(key(c.name),kk)<=1)||S.customers.find(c=>key2(c.name.split(/\s+/)[0])===k)}
 /* Returns a WhatsApp-ready number (country code, digits only), '' for blank, or null if it does not look like a mobile number. */
 function cleanPhone(v){const d=String(v||'').replace(/\D/g,'').replace(/^0+/,'');if(!d)return'';if(d.length===10)return'91'+d;return d.length>=11&&d.length<=13?d:null}
-function saveCustomer(c){persist();if(db)db.collection('customers').doc(c.id).set({name:c.name,phone:c.phone||''}).catch(()=>{});
-  if(store)outbox({t:'cust',row:{id:c.id,store_id:store.id,name:c.name,phone:c.phone||'',deleted:false}})}
+function saveCustomer(c){if(store)c.u=1;persist();if(db)db.collection('customers').doc(c.id).set({name:c.name,phone:c.phone||''}).catch(()=>{});
+  if(store)khataPush()}
 function addCustomer(name,phone){name=name.replace(/(^|\s)\S/g,m=>m.toUpperCase());const c={id:nid('c'),name,phone:phone||''};S.customers.push(c);saveCustomer(c);return c}
-function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,note:note||'',at:Date.now()};S.khata.unshift(e);persist();
+function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,note:note||'',at:Date.now()};if(store)e.u=1;S.khata.unshift(e);persist();
   if(db)db.collection('khata').doc(e.id).set({cid:e.cid,amount,note:e.note,at:e.at}).catch(()=>{});
-  if(store)outbox({t:'khata',row:{id:e.id,store_id:store.id,customer_id:c.id,amount_paise:Math.round(amount*100),note:e.note,created_at:new Date().toISOString()}});
+  if(store)khataPush();
   if(!noUndo){S.undo={what:tm('खात्याची नोंद','khata entry','the khata entry'),run:()=>addKhata(c,-amount,'undo',true)};showUndo()}renderKhata()}
 function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=numTok&&numTok.num;
   const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&!['dal','do','de','dena','dijiye','karo'].includes(x.k2)&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
