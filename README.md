@@ -81,12 +81,14 @@ owner or staff member signs in.
    email carries a 6-digit code.
 
 4. Optional, for the web prototype's Claude fallback: deploy the two functions that let Claude
-   interpret sentences the built-in rules miss (`understand`) and answer business questions
-   from the shop's own numbers (`advise`).
+   interpret sentences the built-in rules miss (`understand`) answer business questions
+   from the shop's own numbers (`advise`), and do the smaller jobs (`assist`): reading a photo of a
+   khata page or a product pack, writing WhatsApp messages, the weekly summary, and unit and price checks.
 
    ```bash
    npx supabase functions deploy understand
    npx supabase functions deploy advise
+   npx supabase functions deploy assist
    npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
 
