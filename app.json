@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "voice-inventory",
+    "name": "Dukaan Voice",
     "slug": "voice-inventory",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,7 +34,13 @@
         }
       ],
       "expo-sqlite",
-      "expo-speech-recognition"
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Dukaan Voice to hear your price questions and stock updates.",
+          "speechRecognitionPermission": "Allow Dukaan Voice to turn your voice into text."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
