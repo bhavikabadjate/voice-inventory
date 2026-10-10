@@ -4,6 +4,7 @@
 import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
 
+import { emptyShop, type Shop } from '@/core/bill-document';
 import type { Product } from '@/core/billing';
 import type { Action } from '@/core/conversation';
 import type { Unit } from '@/core/units';
@@ -40,6 +41,16 @@ export async function migrate(db: SQLiteDatabase) {
       changed_at TEXT NOT NULL
     );
   `);
+  // Later schema changes, applied once each, in order.
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const version = row?.user_version ?? 0;
+  if (version < 1) {
+    await db.execAsync(`
+      ALTER TABLE products ADD COLUMN low_stock_at REAL;
+      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      PRAGMA user_version = 1;
+    `);
+  }
 }
 
 interface ProductRow {
@@ -50,6 +61,7 @@ interface ProductRow {
   cost_paise: number;
   stock: number;
   expiry: string | null;
+  low_stock_at: number | null;
 }
 
 function fromRow(row: ProductRow): Product {
@@ -61,6 +73,7 @@ function fromRow(row: ProductRow): Product {
     costPaise: row.cost_paise,
     stock: row.stock,
     expiry: row.expiry ?? undefined,
+    lowStockAt: row.low_stock_at ?? undefined,
   };
 }
 
@@ -78,12 +91,14 @@ export async function saveProduct(db: SQLiteDatabase, p: Product) {
   await db.withTransactionAsync(async () => {
     const old = await db.getFirstAsync<ProductRow>('SELECT * FROM products WHERE id = ?', p.id);
     await db.runAsync(
-      `INSERT INTO products (id, names, unit, sell_paise, cost_paise, stock, expiry, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO products (id, names, unit, sell_paise, cost_paise, stock, expiry, low_stock_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET names = excluded.names, unit = excluded.unit,
          sell_paise = excluded.sell_paise, cost_paise = excluded.cost_paise,
-         stock = excluded.stock, expiry = excluded.expiry, updated_at = excluded.updated_at`,
-      p.id, JSON.stringify(p.names), p.unit, p.sellPaise, p.costPaise, p.stock, p.expiry ?? null, now,
+         stock = excluded.stock, expiry = excluded.expiry, low_stock_at = excluded.low_stock_at,
+         updated_at = excluded.updated_at`,
+      p.id, JSON.stringify(p.names), p.unit, p.sellPaise, p.costPaise, p.stock, p.expiry ?? null,
+      p.lowStockAt ?? null, now,
     );
     if (!old || old.sell_paise !== p.sellPaise || old.cost_paise !== p.costPaise) {
       await db.runAsync(
@@ -159,6 +174,18 @@ export async function applyAction(db: SQLiteDatabase, action: Action) {
       return;
     }
   }
+}
+
+export async function getShop(db: SQLiteDatabase): Promise<Shop> {
+  const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM settings WHERE key = 'shop'");
+  return row ? { ...emptyShop, ...JSON.parse(row.value) } : emptyShop;
+}
+
+export async function saveShop(db: SQLiteDatabase, shop: Shop) {
+  await db.runAsync(
+    "INSERT INTO settings (key, value) VALUES ('shop', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    JSON.stringify(shop),
+  );
 }
 
 /** Total of today's sales, in paise. */

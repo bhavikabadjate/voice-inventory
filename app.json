@@ -40,7 +40,8 @@
           "microphonePermission": "Allow Dukaan Voice to hear your price questions and stock updates.",
           "speechRecognitionPermission": "Allow Dukaan Voice to turn your voice into text."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
