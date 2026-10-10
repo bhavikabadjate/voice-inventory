@@ -295,7 +295,7 @@ function tokenize(text){
   const raw=s.split(/\s+/).filter(Boolean);
   const toks=raw.map(r=>{const k=key(r),k2=key2(r);return{raw:r,k,k2,num:/^\d+(\.\d+)?$/.test(r)?parseFloat(r):(r==='at'?undefined:NUM[k2])}});
   toks.forEach((t,i)=>{const p=toks[i-1];
-    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||inS(W.KSTOP,p)||p.k2==='de'))t.num=undefined;
+    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||inS(W.KSTOP,p)||p.k2==='de'||p.k2==='dal'))t.num=undefined;
     t.unit=t.num===undefined?UNIT[t.k2]:undefined;t.sep=t.raw===','||inS(W.SEP,t)});
   return toks}
 
@@ -316,7 +316,7 @@ function parseItems(toks,adding){const idx=nameIndex(),words=nameWords(),items=[
     for(n=3;n>=1&&!hit;n--){if(i+n>toks.length)continue;const sl=toks.slice(i,i+n),k=sl.map(x=>x.k).join(''),k2=sl.map(x=>x.k2).join('');
       const m=(idx.get(k)||[]).filter(e=>k.length>=3||e.k2===k2);if(m.length){hit=new Set(m.map(e=>e.id));break}
       /* No product has exactly this name: look for products whose name contains these words. A longer phrase wins over a shorter exact name. */
-      if(sl.some(x=>x.num!==undefined||x.unit||x.sep||Object.values(W).some(w=>inS(w,x)))||(n===1&&(adding||t.k.length<3)))continue;
+      if(sl.some(x=>x.num!==undefined||x.unit||x.sep||Object.values(W).some(w=>inS(w,x)))||(n===1&&(adding||t.k2.length<3)))continue;
       const pm=partial(sl);if(pm.size){hit=pm;break}}
     if(!hit&&t.k.length>=4&&!Object.values(W).some(s=>inS(s,t))){for(const [k,es] of idx)if(k.length>=4&&lev(k,t.k)<=1){hit=new Set(es.map(e=>e.id));n=1;break}}
     if(hit){if(hit.size>1){const pf=S.prefers&&[...hit].find(id=>S.prefers.has(id));if(pf)hit=new Set([pf]);else if(!amb)amb=[...hit]}
@@ -502,7 +502,7 @@ function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,not
   if(store)outbox({t:'khata',row:{id:e.id,store_id:store.id,customer_id:c.id,amount_paise:Math.round(amount*100),note:e.note,created_at:new Date().toISOString()}});
   if(!noUndo)S.undo={what:tm('खात्याची नोंद','khata entry','the khata entry'),run:()=>addKhata(c,-amount,'undo',true)};renderKhata()}
 function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=numTok&&numTok.num;
-  const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k2!=='dal'&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
+  const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&!['dal','do','de','dena','dijiye','karo'].includes(x.k2)&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
   if(!nm){const l=S.customers.map(c=>[c,balance(c.id)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
     return say(l.length?tm('सर्वात जास्त बाकी:\n','Sabse zyada baki:\n','Most owed:\n')+l.slice(0,5).map(([c,b])=>`${c.name} ${fm(b)}`).join('\n')+`\n${tm('एकूण','Kul','Total')} ${fm(l.reduce((a,x)=>a+x[1],0))}`:tm('कोणाचीही बाकी नाही.','Kisi ka kuch baki nahi hai.','Nobody owes anything.'))}
   const c=findCustomer(nm),name=c?c.name:nm.replace(/(^|\s)\S/g,m=>m.toUpperCase()),pay=has(W.JAMA),useBill=num===undefined&&!has(W.KITNA)&&toks.some(x=>['isko','bill','yeh','ye','iska'].includes(x.k2));
