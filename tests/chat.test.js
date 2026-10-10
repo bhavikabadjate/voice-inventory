@@ -56,17 +56,27 @@ const cases=[
  ['advice: no sales yet',[],['is hafte profit kaise badhayein'],/kaafi bikri ka data nahi/],
  ['advice: uses own numbers',[],['2 litre dudh becha','haan','Ramesh ke khate mein 200 likho','haan','bikri kaise badhayein'],/Milk \(₹112[\s\S]*Udhaar ₹200/],
  ['advice: does not hijack a price question',[],['dudh kitne ka hai'],/₹56 per litre/],
+ ['batches: restock with a new date adds a batch',['exp'],['milk add karo','10 litre','haan','14 Oct','haan'],/30 litre/,{milk:30,batches:3}],
+ ['batches: sale uses the earliest dates first',['exp'],['milk add karo','10 litre','haan','14 Oct','haan','12 litre dudh becha','haan'],/Sale save/,{milk:18,batches:2}],
+ ['batches: untracked product is not asked for a date',[],['milk add karo','10 litre','haan','haan'],/30 litre/,{milk:30,batches:1}],
+ ['batches: expiry list shows the batch quantity',['exp'],['kya expire hone wala hai'],/Milk: 5 litre/],
+ ['marathi: price reply language-neutral',['mr'],['दूध कितीला आहे'],/₹56 per litre/],
+ ['marathi: sale confirm and save',['mr'],['2 लिटर दूध विकले','हो'],/विकले[\s\S]*विक्री सेव्ह झाली/,{milk:18}],
+ ['marathi: stock question',['mr'],['साखर किती शिल्लक आहे'],/Sugar: 12 kg शिल्लक आहे/],
+ ['marathi: not understood',['mr'],['आज हवामान कसे आहे'],/समजले नाही/],
+ ['samples: load adds products, sales and khata',['samples'],['aaj ka hisaab'],/Aaj ₹|koi bikri/,{khata:8}],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`
 (async()=>{let fail=0;
 for(const [name,flags,says,want,end] of cases){
   S.products=flags.includes('empty')?[]:shop();if(flags.includes('dup'))S.products.push({id:'m2',name:'milk',names:[],unit:'L',qty:3,cost:null,sell:56,low:0});
-  S.sales=[];S.moves=[];S.customers=[];S.khata=[];S.lastSale=null;S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang='hi';mode=flags.includes('sales')?'sales':'talk';log.length=0;
+  S.sales=[];S.moves=[];S.customers=[];S.khata=[];S.lastSale=null;S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang=flags.includes('mr')?'mr':'hi';if(flags.includes('exp')){const d=new Date(Date.now()+2*864e5).toISOString().slice(0,10);S.products[0].batches=[{qty:5,exp:d},{qty:15,exp:''}];S.products[0].expiry=d}mode=flags.includes('sales')?'sales':'talk';log.length=0;
   if(flags.includes('voiceadd')){S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};advanceAdd()}
+  if(flags.includes('samples'))loadSamples();
   for(const m of says)await handle(m);
   const all=log.join(' | '),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
-  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:k==='khata'?S.khata.length===end[k]:q(k)===end[k]);
+  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:k==='khata'?S.khata.length===end[k]:k==='batches'?(S.products.find(p=>p.id==='milk').batches||[]).length===end[k]:q(k)===end[k]);
   if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length,khata:S.khata.length}):'')}
 }
 console.log(fail?fail+' failed':'all '+cases.length+' passed');process.exit(fail?1:0)})()`);
