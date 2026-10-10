@@ -70,19 +70,60 @@ td.n,th.n{text-align:right}
 .form input,.form select{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);min-width:0;width:100%}
 .empty{color:var(--muted);padding:20px 0}
 a{color:var(--accent)}
+
+/* --- refined layout --- */
+body{background:radial-gradient(120% 60% at 50% 0%,color-mix(in srgb,var(--accent) 9%,var(--bg)),var(--bg) 70%) fixed,var(--bg)}
+header{align-items:center;flex-wrap:nowrap}
+.brand{display:flex;flex-direction:column;gap:2px;min-width:0}
+h1{font-size:1.75rem;letter-spacing:-.01em}
+.status{display:flex;align-items:center;gap:5px}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.ctl{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.ctl .row{gap:6px;flex-wrap:nowrap}
+.tog{font-size:.78rem;font-weight:600;color:var(--muted);border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;cursor:pointer;user-select:none}
+.tog input{position:absolute;opacity:0;width:0;height:0}
+.tog:has(input:checked){background:var(--haldi-soft);border-color:var(--haldi);color:var(--ink)}
+.tog:has(input:focus-visible){outline:2px solid var(--haldi);outline-offset:2px}
+.seg button{padding:5px 14px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:0;background:color-mix(in srgb,var(--line) 70%,transparent);border-radius:14px;padding:4px}
+.tabs button{margin:0;border:0;border-radius:10px;padding:8px 6px;text-align:center}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgb(0 0 0/.12)}
+.thread{gap:10px;padding-inline:2px}
+.msg{box-shadow:0 1px 2px rgb(0 0 0/.05)}
+.msg.me{font-size:.95rem}
+.msg.bot.latest{border-width:1.5px;font-family:var(--display);font-weight:600;font-size:1.35rem;line-height:1.3}
+.tips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-block:2px;margin-inline:-16px;padding-inline:16px;flex:none}
+.tips::-webkit-scrollbar{display:none}
+.tips .chip{flex:none;font-size:.88rem;font-weight:500;color:var(--muted);padding:6px 12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:14px 12px 12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -6px 24px rgb(0 0 0/.06);flex:none}
+.panel .hint{color:var(--warn);text-align:center}
+.panel .hint:empty{display:none}
+.dock{padding:0}
+.mic{width:78px;height:78px}
+.micLabel{margin-top:10px;font-size:.95rem}
+.composer input{background:var(--bg);border-width:1px}
+.bill{border-style:solid;border-width:1px;border-radius:16px;padding:12px 14px;flex:none}
+.bill h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-family:var(--body)}
+.bill tfoot td{font-size:1.15rem;padding-top:6px}
+.bill .row{flex-wrap:nowrap}
+.bill .btn{padding:7px 14px;font-size:.92rem;white-space:nowrap}
+.btn.wa{text-decoration:none;color:var(--accent);margin-left:auto}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:2px 14px}
+.list .item:last-child{border-bottom:0}
+.item{padding:12px 0}
+.pill{background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.form{border-radius:16px}
 </style>
 <div class="app">
   <header>
-    <h1>Bolo <span>Dukaan</span></h1>
-    <div class="row">
+    <div class="brand"><h1>Bolo <span>Dukaan</span></h1><span class="status" id="status">Connecting…</span></div>
+    <div class="ctl">
       <span class="seg" role="group" aria-label="Language"><button type="button" id="lang-hi" aria-pressed="true">हिंदी</button><button type="button" id="lang-en" aria-pressed="false">English</button></span>
-      <span class="status" id="status">Connecting…</span>
-      <label class="status"><input type="checkbox" id="speakOn"> Speak</label>
-      <label class="status"><input type="checkbox" id="costOn"> Show cost</label>
+      <div class="row"><label class="tog"><input type="checkbox" id="speakOn"> Speak</label><label class="tog"><input type="checkbox" id="costOn"> Cost</label></div>
     </div>
   </header>
   <div class="tabs" role="tablist">
-    <button role="tab" data-tab="talk" aria-selected="true">Assistant</button>
+    <button role="tab" data-tab="talk" aria-selected="true">Ask</button>
     <button role="tab" data-tab="stock" aria-selected="false">Stock</button>
     <button role="tab" data-tab="sales" aria-selected="false">Sales</button>
   </div>
@@ -90,7 +131,9 @@ a{color:var(--accent)}
   <section class="pane" id="pane-talk">
     <div class="thread" id="thread" aria-live="polite"></div>
     <div class="bill" id="bill" hidden></div>
-    <p class="hint" id="speakNote" style="color:var(--warn);text-align:center"></p>
+    <div class="tips" id="tips" aria-label="Try saying"></div>
+    <div class="panel">
+    <p class="hint" id="speakNote"></p>
     <div class="dock">
       <button class="mic" type="button" id="mic" aria-label="Tap and speak"><svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg></button>
       <p class="micLabel" id="micLabel">Tap karke bolo</p>
@@ -99,6 +142,7 @@ a{color:var(--accent)}
       <input id="say" autocomplete="off" placeholder="Ya yahan likho: 2 litre dudh kitne ka hai?" aria-label="Message">
       <button class="btn go" type="submit">Send</button>
     </form>
+    </div>
   </section>
 
   <section class="pane" id="pane-stock" hidden>
@@ -319,12 +363,12 @@ function renderBill(){const b=$('bill');b.hidden=!S.bill.length;if(!S.bill.lengt
   const txt=S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
   b.innerHTML=`<h2>Bill</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td></tr>`).join('')}</tbody>
   <tfoot><tr><td colspan="3">Total</td><td class="n">${fm(billTotal())}</td></tr></tfoot></table>
-  <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">Confirm sale</button><button class="btn" id="b-clear">Clear</button><a target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Share on WhatsApp</a></div>`;
+  <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">Confirm sale</button><button class="btn" id="b-clear">Clear</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`;
   $('b-ok').onclick=confirmBill;$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
 function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
   const low=ps.filter(p=>p.low&&p.qty<=p.low).length,exp=ps.filter(p=>p.expiry&&daysTo(p.expiry)<=7).length;
   $('alerts').textContent=[low&&low+' low on stock',exp&&exp+' expiring within a week'].filter(Boolean).join(' · ');
-  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?'<span class="pill">Low</span>':''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?'Expired':'Expires '+esc(p.expiry)}</span>`:''}</span>
+  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?'<span class="pill">Low</span>':''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?'Expired':'Expires '+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
    <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?' · cost '+fm(p.cost):''}</span></button>`).join('')
    :'<p class="empty">No products yet. Tap Add product, or tell the assistant "cheeni add karo".</p>'}
 function renderSales(){const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
@@ -366,9 +410,10 @@ $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechReco
 $('composer').onsubmit=e=>{e.preventDefault();const v=$('say').value;$('say').value='';handle(v)};
 
 renderAll();
-function greet(){say(t('Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell me anything about the shop.'),S.lang==='en'?
+function greet(){say(t('Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell me anything about the shop.'));const c=S.lang==='en'?
   [['Price of milk?','price of milk'],['1 litre milk and 2 kg sugar','1 litre milk and 2 kg sugar total'],['How much sugar is left?','how much sugar is left'],['Add ragi','add ragi']]:
-  [['Dudh kitne ka hai?','dudh kitne ka hai?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']])}
+  [['Dudh kitne ka hai?','dudh kitne ka hai?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']];
+  const el=$('tips');el.innerHTML='';c.forEach(([l,sd])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=l;b.onclick=()=>handle(sd);el.append(b)})}
 /* The language switch sets what the mic listens for, the reply language and the voice. */
 function setLang(l,quiet){S.lang=l;try{localStorage.setItem('lang',l)}catch(e){}
   $('lang-hi').setAttribute('aria-pressed',l==='hi');$('lang-en').setAttribute('aria-pressed',l==='en');
