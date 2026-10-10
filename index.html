@@ -390,7 +390,8 @@ const K=list=>{const s=new Set();list.split(' ').forEach(w=>{s.add(key2(w));cons
 const inS=(set,t)=>set.has(t.k2)||(t.k.length>=3&&set.has(t.k));
 const NUM={};[['ek one',1],['do don two',2],['teen tin three',3],['char four',4],['paanch panch pach five',5],['chhe saha six छह छे',6],
  ['saat seven',7],['aath eight',8],['nau nine',9],['das daha ten',10],['gyarah',11],['barah bara',12],['pandrah',15],['bees vees',20],
- ['pachees',25],['tees',30],['chalis',40],['pachas',50],['sau',100],['aadha adha ardha half',.5],['dedh',1.5],['dhai adich',2.5],['pav paav',.25],['sawa',1.25]]
+ ['pachees',25],['tees',30],['chalis',40],['pachas',50],['sau hundred shambhar',100],['hazaar hajar thousand',1000],
+ ['eleven',11],['twelve',12],['terah thirteen',13],['chaudah fourteen',14],['fifteen',15],['solah sixteen',16],['satrah seventeen',17],['atharah eighteen',18],['unnis nineteen',19],['twenty',20],['thirty',30],['forty fourty',40],['fifty',50],['sixty',60],['sattar seventy',70],['assi eighty',80],['nabbe ninety',90],['aadha adha ardha half',.5],['dedh',1.5],['dhai adich',2.5],['pav paav',.25],['sawa',1.25]]
  .forEach(([w,n])=>w.split(' ').forEach(x=>NUM[key2(x)]=n));
 const UNIT={};[['litre liter litr ltr l litres lit लीटर लिटर','l'],['ml','ml'],['kg kilo kilogram kilos किलो','kg'],['gram grams gm g ग्राम','g'],
  ['piece pieces pcs pc nag','pc'],['packet packets pkt pudi पैकेट पाकीट','packet'],['dozen darjan दर्जन','dozen']]
@@ -417,9 +418,13 @@ function tokenize(text){
     .replace(/(\d)([^\d\s.])/g,'$1 $2').replace(/([^\d\s.])(\d)/g,'$1 $2').replace(/\.(\s|$)/g,' ');
   const raw=s.split(/\s+/).filter(Boolean);
   const toks=raw.map(r=>{const k=key(r),k2=key2(r);return{raw:r,k,k2,num:/^\d+(\.\d+)?$/.test(r)?parseFloat(r):(r==='at'?undefined:NUM[k2])}});
+  /* "twenty five" is one number */
+  for(let i=0;i<toks.length-1;i++){const a=toks[i],b=toks[i+1];if(a.num>=20&&a.num<=90&&a.num%10===0&&b.num>=1&&b.num<=9&&Number.isInteger(b.num)&&!/^\d/.test(a.raw)&&!/^\d/.test(b.raw)&&/^(twenty|thirty|fou?rty|fifty|sixty|seventy|eighty|ninety)$/i.test(a.raw)){a.num+=b.num;a.raw+=' '+b.raw;toks.splice(i+1,1)}}
   {const MULT={[key2('sau')]:100,[key2('hundred')]:100,[key2('shambhar')]:100,[key2('hazaar')]:1000,[key2('hajar')]:1000,[key2('thousand')]:1000};
     for(let i=0;i<toks.length-1;i++){const a=toks[i],b=toks[i+1],m=MULT[b.k2];if(a.num===undefined||!m||MULT[a.k2])continue;a.num*=m;a.raw+=' '+b.raw;toks.splice(i+1,1);
-      const c=toks[i+1];if(c&&c.num!==undefined&&c.num<m&&c.num>=1&&!/^\d/.test(c.raw)&&!MULT[c.k2]){a.num+=c.num;toks.splice(i+1,1)}i--}}
+      let c=toks[i+1];if(c&&c.k2===key2('and')&&toks[i+2]&&toks[i+2].num!==undefined){toks.splice(i+1,1);c=toks[i+1]}if(c&&c.num!==undefined&&c.num<m&&c.num>=1&&!/^\d/.test(c.raw)&&!MULT[c.k2]&&!(toks[i+2]&&MULT[toks[i+2].k2])){a.num+=c.num;a.raw+=' '+c.raw;toks.splice(i+1,1)}i--}
+    /* "two thousand five hundred" */
+    for(let i=0;i<toks.length-1;i++){const a=toks[i],b=toks[i+1];if(a.num>=1000&&/thousand|haz+ar|hajar/i.test(a.raw)&&b.num>=1&&b.num<1000&&!/^\d/.test(b.raw)){a.num+=b.num;a.raw+=' '+b.raw;toks.splice(i+1,1)}}}
   toks.forEach((t,i)=>{const p=toks[i-1];
     if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||inS(W.KSTOP,p)||inS(W.SELL,p)||p.k2==='de'||p.k2==='dal'))t.num=undefined;
     t.unit=t.num===undefined?UNIT[t.k2]:undefined;t.sep=t.raw===','||inS(W.SEP,t)});
