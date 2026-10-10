@@ -192,6 +192,7 @@ div.item{cursor:pointer}
     <form class="form" id="edit" hidden>
       <label class="w">Name<input id="f-name" required></label>
       <label class="w">Other names, comma separated<input id="f-names" placeholder="dudh, दूध, doodh"></label>
+      <div class="w" style="grid-column:1/-1"><button class="chip" type="button" id="f-suggest">Suggest names</button><span class="status" id="f-smsg" style="display:inline-flex;margin-left:8px"></span><div class="chips" id="f-sugg"></div></div>
       <label>Unit<select id="f-unit"><option value="L">litre</option><option value="kg">kg</option><option value="pc">piece</option><option value="packet">packet</option></select></label>
       <label>Quantity in stock<input id="f-qty" type="number" step="any" min="0"></label>
       <label>Selling price ₹<input id="f-sell" type="number" step="any" min="0" required></label>
@@ -522,6 +523,21 @@ function reorder(){const l=lowItems();if(!l.length)return say(tm('सध्य�
   const lines=l.map(p=>`${p.name}: ${fq(p.qty,p.unit)} ${tm('शिल्लक','bacha','left')}`);
   say(tm('हे मागवायचे आहे:\n','Yeh mangwana hai:\n','To reorder:\n')+lines.join('\n'),[[tm('WhatsApp वर पाठवा','WhatsApp par bhejo','Send on WhatsApp'),'https://wa.me/?text='+encodeURIComponent(`${S.shop.name?S.shop.name+' - ':''}Order:\n`+l.map(p=>`- ${p.name}`).join('\n')),1]])}
 
+/* ---------- other names for a product: built-in list first, then Claude ---------- */
+const NAME_GROUPS=[['Jeera','जीरा','jire','जिरे','cumin'],['Dhaniya','धनिया','dhane','धणे','coriander'],['Rai','sarson','mohri','मोहरी','राई','mustard'],['Poha','पोहा','pohe','पोहे','flattened rice'],['Rava','suji','sooji','रवा','सूजी','semolina'],['Maida','मैदा','refined flour'],
+ ['Chana Dal','चना दाल','harbara dal','हरभरा डाळ'],['Masoor Dal','मसूर','masur'],['Urad Dal','उड़द दाल','udid dal','उडीद डाळ'],['Groundnut','moongphali','मूंगफली','shengdana','शेंगदाणे','peanut'],['Jaggery','gud','गुड़','gul','गूळ'],['Coconut','nariyal','नारियल','naral','नारळ'],
+ ['Garlic','lahsun','लहसुन','lasun','लसूण'],['Ginger','adrak','अदरक','ale','आले'],['Tomato','tamatar','टमाटर','टोमॅटो'],['Butter','makhan','मक्खन','loni','लोणी'],['Coffee','कॉफी'],['Sabudana','साबूदाना','sago','साबुदाणा'],['Chana','चना','harbara','हरभरा','chickpea'],
+ ['Rajma','राजमा','kidney beans'],['Black Pepper','kali mirch','काली मिर्च','miri','मिरी'],['Elaichi','इलायची','velchi','वेलची','cardamom'],['Lemon','nimbu','नींबू','limbu','लिंबू'],['Green Chilli','hari mirch','हरी मिर्च','hirvi mirchi','हिरवी मिरची'],['Toothpaste','manjan','मंजन'],['Matchbox','machis','माचिस','kadipeti','काडीपेटी']];
+function knownNames(name){const k=key2(name),out=[];
+  for(const g of [...SAMPLES.map(x=>[x[0],...x[1]]),...NAME_GROUPS])if(g.some(n=>key2(n)===k||(key(n).length>=4&&key(n)===key(name))))out.push(...g);return out}
+async function suggestNames(name,have){const seen=new Set([name,...(have||[])].map(key2)),out=[];
+  const take=l=>l.forEach(n=>{n=String(n).trim().replace(/^["'\-\s]+|["'.\s]+$/g,'');const k=key2(n);if(n&&n.length<=30&&k&&!seen.has(k)){seen.add(k);out.push(n)}});
+  take(knownNames(name));let ai='';
+  const ask=`Give up to 8 other names an Indian shopkeeper or customer might say for the grocery item "${name}": Hindi and Marathi names in Devanagari, the same names spelled in Roman letters, and the English name. Only real, common names for exactly this item, no brands, no explanations. Reply with a comma-separated list only.`;
+  try{if(sample){const r=await sample(ask,{modelTier:'quick'});ai=r.text||''}
+    else if(sb&&session&&store){const {data,error}=await sb.functions.invoke('understand',{body:{names_for:name}});if(!error)ai=(data&&data.names)||''}}catch(e){}
+  take(ai.split(/[,\n،]/));return out.slice(0,10)}
+
 /* ---------- example data, for trying the app out ---------- */
 const SAMPLES=[['Milk',['dudh','दूध','doodh'],'L',48,56,20,5,4],['Curd',['dahi','दही'],'kg',60,75,6,2,3],['Paneer',['पनीर'],'kg',320,380,3,1,5],['Bread',['pav','ब्रेड'],'packet',32,40,12,4,2],['Eggs',['anda','ande','अंडा','अंडी'],'pc',5.5,7,90,24,12],
  ['Sugar',['cheeni','चीनी','sakhar','साखर'],'kg',39,44,35,8],['Atta',['आटा','gehu atta','kanik','कणीक'],'kg',36,42,50,10],['Rice',['chawal','चावल','tandul','तांदूळ'],'kg',52,62,45,10],['Toor Dal',['arhar','tur dal','तूर डाळ','dal'],'kg',128,145,18,5],['Moong Dal',['मूंग दाल','mug dal'],'kg',105,120,10,3],
@@ -579,6 +595,9 @@ async function advise(question){const f=shopFacts();let ans='',viaAI=false;
   /* Advice built on cost prices stays on screen and is not read aloud. */
   say(ans,null,f.hasCostData?t('Salah screen par likhi hai.','The advice is on the screen.'):ans)}
 
+/* After a new product is added by voice, suggest other names it might be called by. */
+async function offerNames(p){if(!p)return;const list=await suggestNames(p.name,p.names);if(!list.length||!S.products.some(x=>x.id===p.id))return;S.nameOffer={pid:p.id,list};
+  say(t(`${p.name} ko log aur kis naam se bolte hain? Jo sahi ho woh chuno.`,`What else do people call ${p.name}? Pick the ones that are right.`),[...list.map((n,i)=>[n,'#nm:'+i]),[t('Sab jodo','Add all'),'#nm:all',1]])}
 /* ---------- conversation ---------- */
 const t=(hi,en)=>S.lang==='en'?en:hi;
 /* Marathi where a translation exists; otherwise the Hindi line is used. */
@@ -619,6 +638,9 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
         n.qty=Math.round(q*1000)/1000;saveProduct(n);say(t(`${a.name} ek kar diya, stock ${fq(n.qty,n.unit)}.`,`Merged into one ${a.name}, stock ${fq(n.qty,n.unit)}.`))}}
     else S.prefer=text.slice(6);
     try{await handle(o,true)}finally{S.prefer=null}return}
+  if(text.startsWith('#nm:')){const o=S.nameOffer,p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;const pickd=text==='#nm:all'?o.list:[o.list[+text.slice(4)]].filter(Boolean);
+    const add=pickd.filter(n=>![p.name,...(p.names||[])].some(x=>key2(x)===key2(n)));if(!add.length)return;saveProduct({...p,names:[...(p.names||[]),...add]},'set',true);
+    return say(t(`${p.name} ke naam mein jud gaya: ${add.join(', ')}`,`Added to ${p.name}'s names: ${add.join(', ')}`))}
   if(text==='#forcebill')return confirmBill(true);
   if(text==='#alias'){const o=S.aliasOffer;S.aliasOffer=null;const p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;saveProduct({...p,names:[...(p.names||[]),o.nm]},'set',true);return say(t(`"${o.nm}" ab ${p.name} ka naam hai.`,`"${o.nm}" is now a name for ${p.name}.`))}
   if(text==='#bill'){if(S.quote){addToBill(S.quote);S.quote=null}return showTab('sales')}
@@ -707,7 +729,7 @@ function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==
     case'confirm':S.pending=null;if(!yes){say(tm('ठीक आहे, काही सेव्ह केले नाही.','Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}
       if(a.p){const p=S.products.find(x=>x.id===a.p.id)||a.p,n={...p,qty:Math.round((p.qty+a.q)*1000)/1000,sell:a.sell};n.addExp=a.exp||'';
         if(a.sell!==p.sell)n.history=[...(p.history||[]),{from:p.sell,to:a.sell,at:Date.now()}];saveProduct(n,'restock');say(tm(`${p.name} आता ${fq(n.qty,n.unit)} आहे.`,`${p.name} ab ${fq(n.qty,n.unit)} hai.`,`${p.name} is now ${fq(n.qty,n.unit)}.`))}
-      else{saveProduct({id:nid('p'),name:a.name,names:[],unit:a.u,qty:a.q,cost:a.cost,sell:a.sell,low:0,addExp:a.exp||''});say(tm(`${a.name} जोडले. Stock टॅबमध्ये आणखी नावे जोडू शकता.`,`${a.name} jud gaya. Stock tab mein aur naam jod sakte ho.`,`${a.name} added. You can add more names in the Stock tab.`))}
+      else{saveProduct({id:nid('p'),name:a.name,names:[],unit:a.u,qty:a.q,cost:a.cost,sell:a.sell,low:0,addExp:a.exp||''});say(t(`${a.name} jud gaya.`,`${a.name} added.`));offerNames(S.products[S.products.length-1])}
       return true}
   advanceAdd();return true}
 
@@ -743,7 +765,7 @@ const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs
 function renderMoves(){$('moveList').innerHTML=S.moves.length?S.moves.slice(0,60).map(moveRow).join(''):'<p class="empty">'+t('Abhi koi stock badlav nahi.','No stock changes yet.')+'</p>'}
 function renderAll(){renderStock();renderSales();renderQuick();renderMoves();renderKhata();renderInfo()}
 
-function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p||!canDel();p=p||{};
+function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p||!canDel();p=p||{};$('f-sugg').innerHTML='';$('f-smsg').textContent='';
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';const lg=S.moves.filter(m=>m.pid===S.editing).slice(0,6);const bl=p.id?bOf(p).filter(b=>b.qty>0):[];$('f-log').innerHTML=(bl.length>1||bl.some(b=>b.exp)?'<b>'+t('Batch','Batches')+'</b>'+bl.map(b=>`<div class="item"><span>${fq(b.qty,p.unit)}</span><span class="p" style="font-weight:400">${b.exp?fmtD(b.exp):t('date nahi','no date')}</span></div>`).join(''):'')+(lg.length?'<b>'+t('Pichhle badlav','Recent changes')+'</b>'+lg.map(moveRow).join(''):'');$('f-name').focus()}
 $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.editing)||{},n=id=>parseFloat($(id).value)||0,sell=n('f-sell');
   if(!old.id){const nk=key2($('f-name').value),dup=S.products.find(x=>[x.name,...(x.names||[])].some(n=>key2(n)===nk));
@@ -755,6 +777,10 @@ $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.
   if($('costOn').checked)p.cost=n('f-cost');else if(p.cost===undefined)p.cost=null;
   if(old.id&&old.sell!==sell)p.history=[...(old.history||[]),{from:old.sell,to:sell,at:Date.now()}];
   saveProduct(p);$('edit').hidden=true};
+$('f-suggest').onclick=async()=>{const nm=$('f-name').value.trim();if(!nm){$('f-smsg').textContent='Type the product name first';return $('f-name').focus()}
+  $('f-smsg').textContent='Looking…';$('f-sugg').innerHTML='';const cur=()=>$('f-names').value.split(',').map(x=>x.trim()).filter(Boolean),list=await suggestNames(nm,cur());
+  $('f-smsg').textContent=list.length?'Tap the ones that are right':'No suggestions for this name';
+  list.forEach(n=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='+ '+n;b.onclick=()=>{$('f-names').value=[...cur(),n].join(', ');b.remove()};$('f-sugg').append(b)})};
 $('f-cancel').onclick=()=>$('edit').hidden=true;
 $('f-del').onclick=()=>{if($('f-del').dataset.sure){deleteProduct(S.editing);$('edit').hidden=true;delete $('f-del').dataset.sure;$('f-del').textContent='Delete'}else{$('f-del').dataset.sure=1;$('f-del').textContent='Tap again to delete'}};
 $('newBtn').onclick=()=>openEdit(null);

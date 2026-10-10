@@ -65,6 +65,9 @@ const cases=[
  ['marathi: stock question',['mr'],['साखर किती शिल्लक आहे'],/Sugar: 12 kg शिल्लक आहे/],
  ['marathi: not understood',['mr'],['आज हवामान कसे आहे'],/समजले नाही/],
  ['samples: load adds products, sales and khata',['samples'],['aaj ka hisaab'],/Aaj ₹|koi bikri/,{khata:8}],
+ ['names: built-in suggestions after a new product',[],['jeera add karo','2 kg','300','360','nahi','haan'],/kis naam se bolte/],
+ ['names: add all suggested names',[],['jeera add karo','2 kg','300','360','nahi','haan','#nm:all','जीरा kitne ka hai'],/₹360 per kg/],
+ ['names: nothing offered for an unknown item',[],['zzqx add karo','2 kg','300','360','nahi','haan'],/zzqx added\.|zzqx jud gaya\.$/],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`
@@ -74,7 +77,7 @@ for(const [name,flags,says,want,end] of cases){
   S.sales=[];S.moves=[];S.customers=[];S.khata=[];S.lastSale=null;S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang=flags.includes('mr')?'mr':'hi';if(flags.includes('exp')){const d=new Date(Date.now()+2*864e5).toISOString().slice(0,10);S.products[0].batches=[{qty:5,exp:d},{qty:15,exp:''}];S.products[0].expiry=d}mode=flags.includes('sales')?'sales':'talk';log.length=0;
   if(flags.includes('voiceadd')){S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};advanceAdd()}
   if(flags.includes('samples'))loadSamples();
-  for(const m of says)await handle(m);
+  for(const m of says){await handle(m);await new Promise(r=>setTimeout(r,5))}
   const all=log.join(' | '),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
   if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:k==='khata'?S.khata.length===end[k]:k==='batches'?(S.products.find(p=>p.id==='milk').batches||[]).length===end[k]:q(k)===end[k]);
   if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length,khata:S.khata.length}):'')}
