@@ -148,6 +148,9 @@ html,body{overflow:hidden}
 .owe{color:var(--warn)}.clear{color:var(--accent)}
 .kdetail{grid-column:1/-1;font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:4px;padding-top:6px}
 .kdetail div{display:flex;justify-content:space-between;gap:8px}
+.kph{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+#k-phone{font-size:.9rem}
+div.item{cursor:pointer}
 </style>
 <div class="app">
   <header>
@@ -214,6 +217,7 @@ html,body{overflow:hidden}
   <section class="pane" id="pane-khata" hidden>
     <form class="card" id="k-form">
       <div class="row" style="flex-wrap:nowrap"><input id="k-name" placeholder="Customer name" list="k-names" autocomplete="off" style="flex:2;min-width:0"><datalist id="k-names"></datalist><input id="k-amt" type="number" inputmode="decimal" min="0" step="any" placeholder="₹" style="flex:1;min-width:0"></div>
+      <input id="k-phone" type="tel" inputmode="numeric" autocomplete="off" placeholder="Mobile number (optional, for WhatsApp reminders)">
       <div class="row"><button class="btn go" type="submit">Udhaar diya</button><button class="btn" type="button" id="k-paid">Paisa mila</button><span class="status" id="k-msg"></span></div>
     </form>
     <h2 id="khataHead" style="margin:0;font:600 1rem var(--display)"></h2>
@@ -361,9 +365,9 @@ function cloudSave(p,old,reason){const sid=store.id;
   if(delta)outbox({t:'move',row:{id:nid('m'),store_id:sid,product_id:p.id,delta,reason:old?reason:'create',created_at:new Date().toISOString()}})}
 async function allRows(table,cols){let out=[],from=0;for(;;){const d=ck(await sb.from(table).select(cols).eq('store_id',store.id).order(table==='product_costs'?'product_id':'id').range(from,from+999));out=out.concat(d);if(d.length<1000)break;from+=1000}return out}
 async function pull(){if(!store||OB.length)return;
-  const [ps,cs,ms,ss,cu,kh]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta,reason,created_at'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at'),allRows('customers','id,name,deleted').catch(()=>[]),allRows('khata_entries','id,customer_id,amount_paise,note,created_at').catch(()=>[])]);
+  const [ps,cs,ms,ss,cu,kh]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta,reason,created_at'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at'),allRows('customers','id,name,phone,deleted').catch(()=>[]),allRows('khata_entries','id,customer_id,amount_paise,note,created_at').catch(()=>[])]);
   if(OB.length)return;
-  S.customers=cu.filter(c=>!c.deleted).map(c=>({id:c.id,name:c.name}));S.khata=kh.map(k=>({id:k.id,cid:k.customer_id,amount:k.amount_paise/100,note:k.note||'',at:+new Date(k.created_at)})).sort((a,b)=>b.at-a.at);
+  S.customers=cu.filter(c=>!c.deleted).map(c=>({id:c.id,name:c.name,phone:c.phone||''}));S.khata=kh.map(k=>({id:k.id,cid:k.customer_id,amount:k.amount_paise/100,note:k.note||'',at:+new Date(k.created_at)})).sort((a,b)=>b.at-a.at);
   const q={},cost={},byId={};ms.forEach(m=>q[m.product_id]=(q[m.product_id]||0)+m.delta);cs.forEach(c=>cost[c.product_id]=c.cost_paise/100);
   const conv=p=>({id:p.id,name:(p.names&&p.names[0])||'?',names:(p.names||[]).slice(1),unit:R2U[p.unit]||'pc',runit:p.unit,sell:p.sell_paise/100,cost:cost[p.id]??null,qty:Math.round((q[p.id]||0)*1000)/1000,low:p.low_stock_at||0,expiry:p.expiry||''});
   ps.forEach(p=>byId[p.id]=conv(p));
@@ -444,8 +448,11 @@ async function showPay(total){S.lastSale={total,at:Date.now()};const b=$('payBox
 
 const balance=cid=>Math.round(S.khata.filter(e=>e.cid===cid).reduce((a,e)=>a+e.amount,0)*100)/100;
 function findCustomer(name){const k=key2(name),kk=key(name);return S.customers.find(c=>key2(c.name)===k)||S.customers.find(c=>kk.length>=4&&lev(key(c.name),kk)<=1)||S.customers.find(c=>key2(c.name.split(/\s+/)[0])===k)}
-function addCustomer(name){name=name.replace(/(^|\s)\S/g,m=>m.toUpperCase());const c={id:nid('c'),name};S.customers.push(c);
-  if(db)db.collection('customers').doc(c.id).set({name}).catch(()=>{});if(store)outbox({t:'cust',row:{id:c.id,store_id:store.id,name,phone:'',deleted:false}});return c}
+/* Returns a WhatsApp-ready number (country code, digits only), '' for blank, or null if it does not look like a mobile number. */
+function cleanPhone(v){const d=String(v||'').replace(/\D/g,'').replace(/^0+/,'');if(!d)return'';if(d.length===10)return'91'+d;return d.length>=11&&d.length<=13?d:null}
+function saveCustomer(c){persist();if(db)db.collection('customers').doc(c.id).set({name:c.name,phone:c.phone||''}).catch(()=>{});
+  if(store)outbox({t:'cust',row:{id:c.id,store_id:store.id,name:c.name,phone:c.phone||'',deleted:false}})}
+function addCustomer(name,phone){name=name.replace(/(^|\s)\S/g,m=>m.toUpperCase());const c={id:nid('c'),name,phone:phone||''};S.customers.push(c);saveCustomer(c);return c}
 function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,note:note||'',at:Date.now()};S.khata.unshift(e);persist();
   if(db)db.collection('khata').doc(e.id).set({cid:e.cid,amount,note:e.note,at:e.at}).catch(()=>{});
   if(store)outbox({t:'khata',row:{id:e.id,store_id:store.id,customer_id:c.id,amount_paise:Math.round(amount*100),note:e.note,created_at:new Date().toISOString()}});
@@ -464,13 +471,15 @@ function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=num
     if(useBill&&S.bill.length){const sh=short(S.bill);if(sh)return say(t(`Pehle bill theek karo: ${sh}.`,`Fix the bill first: ${sh}.`));recordSale(S.bill);S.bill=[];renderBill()}
     $('payBox').innerHTML='';const cc=c||findCustomer(name)||addCustomer(name);addKhata(cc,pay?-amt:amt,useBill?'bill':'');const b=balance(cc.id);
     say(t(`Likh diya. ${cc.name} ka ab ${fm(Math.max(b,0))} baki hai.`,`Done. ${cc.name} now owes ${fm(Math.max(b,0))}.`))})}
-const remindLink=(c,b)=>'https://wa.me/?text='+encodeURIComponent(`Namaste ${c.name} ji, ${S.shop.name||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`);
+const remindLink=(c,b)=>'https://wa.me/'+(c.phone||'')+'?text='+encodeURIComponent(`Namaste ${c.name} ji, ${S.shop.name||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`);
 function renderKhata(){if(!$('khataList'))return;const rows=S.customers.map(c=>[c,balance(c.id)]).sort((a,b)=>b[1]-a[1]),tot=rows.reduce((a,x)=>a+Math.max(x[1],0),0);
   $('khataHead').textContent=t('Kul baki: ','Total owed: ')+fm(tot);$('k-names').innerHTML=S.customers.map(c=>`<option value="${esc(c.name)}">`).join('');
-  $('khataList').innerHTML=rows.length?rows.map(([c,b])=>`<button class="item" data-c="${esc(c.id)}"><b>${esc(c.name)}</b><span class="p ${b>0?'owe':'clear'}">${b>0?fm(b):b<0?t('jama ','advance ')+fm(-b):t('chukta','settled')}</span>${S.kOpen===c.id?`<span class="kdetail">${S.khata.filter(e=>e.cid===c.id).slice(0,8).map(e=>`<div><span>${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</span><span>${e.amount>0?t('udhaar ','credit ')+fm(e.amount):t('jama ','paid ')+fm(-e.amount)}</span></div>`).join('')}${b>0?`<a class="btn wa" style="margin:4px 0 0;align-self:flex-start" target="_blank" rel="noopener" href="${remindLink(c,b)}">WhatsApp reminder</a>`:''}</span>`:''}</button>`).join('')
+  $('khataList').innerHTML=rows.length?rows.map(([c,b])=>`<div class="item" data-c="${esc(c.id)}" tabindex="0" role="button"><b>${esc(c.name)}</b><span class="p ${b>0?'owe':'clear'}">${b>0?fm(b):b<0?t('jama ','advance ')+fm(-b):t('chukta','settled')}</span>${S.kOpen===c.id?`<span class="kdetail">${S.khata.filter(e=>e.cid===c.id).slice(0,8).map(e=>`<div><span>${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</span><span>${e.amount>0?t('udhaar ','credit ')+fm(e.amount):t('jama ','paid ')+fm(-e.amount)}</span></div>`).join('')}<span class="row" style="flex-wrap:nowrap;margin-top:4px"><input class="kph" type="tel" inputmode="numeric" value="${esc((c.phone||'').replace(/^91(?=\d{10}$)/,''))}" placeholder="${t('Mobile number (optional)','Mobile number (optional)')}" aria-label="Mobile number"><button type="button" class="chip" data-ph="${esc(c.id)}">${t('Number save karo','Save number')}</button></span>${b>0?`<a class="btn wa" style="margin:4px 0 0;align-self:flex-start" target="_blank" rel="noopener" href="${remindLink(c,b)}">${c.phone?t('WhatsApp reminder bhejo','Send WhatsApp reminder'):t('WhatsApp reminder (number chuno)','WhatsApp reminder (pick contact)')}</a>`:''}</span>`:''}</div>`).join('')
     :`<p class="empty">${t('Abhi koi khata nahi. Upar naam aur rakam likho, ya bolo: “Ramesh ke khate mein 200 likho”.','No khata yet. Enter a name and amount above, or say “add 200 to Ramesh khata”.')}</p>`}
 function khataForm(sign){const n=$('k-name').value.trim(),a=parseFloat($('k-amt').value);if(!n||!(a>0)){$('k-msg').textContent=t('Naam aur rakam dono chahiye','Enter both a name and an amount');return}
-  const c=findCustomer(n)||addCustomer(n);addKhata(c,sign*a,'');S.kOpen=c.id;$('k-name').value='';$('k-amt').value='';$('k-msg').textContent=`${c.name}: ${fm(Math.max(balance(c.id),0))} ${t('baki','owed')}`;renderKhata()}
+  const ph=cleanPhone($('k-phone').value);if(ph===null){$('k-msg').textContent=t('Mobile number 10 ank ka hona chahiye','Enter a 10-digit mobile number');return}
+  let c=findCustomer(n);if(!c)c=addCustomer(n,ph);else if(ph&&ph!==c.phone){c.phone=ph;saveCustomer(c)}
+  addKhata(c,sign*a,'');S.kOpen=c.id;$('k-name').value='';$('k-amt').value='';$('k-phone').value='';$('k-msg').textContent=`${c.name}: ${fm(Math.max(balance(c.id),0))} ${t('baki','owed')}`;renderKhata()}
 function hisaab(){const ss=todaySales(),tot=ss.reduce((a,s)=>a+s.total,0),bills=ss.filter(s=>s.total>0).length-ss.filter(s=>s.total<0).length,agg={};let profit=0,known=true;
   ss.forEach(s=>s.items.forEach(i=>{const g=agg[i.name]=agg[i.name]||{amt:0};g.amt+=i.amount;const p=S.products.find(x=>x.name===i.name);if(p&&p.cost!=null)profit+=(i.rate-p.cost)*i.qty;else known=false}));
   const top=Object.entries(agg).filter(x=>x[1].amt>0).sort((a,b)=>b[1].amt-a[1].amt).slice(0,3).map(([n,g])=>`${n} ${fm(g.amt)}`).join(', ');
@@ -681,7 +690,10 @@ $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechReco
       const v=(fin||(got?$('say').value:'')).trim();if(v){$('say').value='';viaMic=true;handle(v)}};
     rec.start()}catch(e){micFallback('The microphone could not start.')}};
 $('k-form').onsubmit=e=>{e.preventDefault();khataForm(1)};$('k-paid').onclick=()=>khataForm(-1);
-$('khataList').onclick=e=>{if(e.target.closest('a'))return;const b=e.target.closest('.item');if(b){S.kOpen=S.kOpen===b.dataset.c?null:b.dataset.c;renderKhata()}};
+$('khataList').onclick=e=>{if(e.target.closest('a,input'))return;const sv=e.target.closest('[data-ph]');
+  if(sv){const c=S.customers.find(x=>x.id===sv.dataset.ph),inp=sv.parentNode.querySelector('.kph'),ph=cleanPhone(inp.value);
+    if(ph===null){inp.value='';inp.placeholder=t('10 ank ka number likho','Enter a 10-digit number');return inp.focus()}c.phone=ph;saveCustomer(c);return renderKhata()}
+  const b=e.target.closest('.item');if(b){S.kOpen=S.kOpen===b.dataset.c?null:b.dataset.c;renderKhata()}};
 $('reorderBtn').onclick=()=>{showTab('talk');handle(t('kya mangwana hai','reorder list'))};
 $('composer').onsubmit=e=>{e.preventDefault();viaMic=false;const v=$('say').value;$('say').value='';handle(v)};
 $('voiceAdd').onclick=()=>{showTab('talk');S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};viaMic=true;advanceAdd();if(!$('speakOn').checked)$('mic').click()};
