@@ -6,6 +6,8 @@ import {
   type Membership,
   type OutboxEntry,
   type Remote,
+  type RemoteCustomer,
+  type RemoteKhataEntry,
   type RemoteMove,
   type RemoteProduct,
   type RemoteSale,
@@ -16,7 +18,9 @@ const STORE = 'store-1';
 
 /** A tiny in-memory stand-in for the cloud, shared by several phones. */
 class FakeCloud {
-  rows: Record<Table, Record<string, any>[]> = { products: [], product_costs: [], stock_moves: [], sales: [] };
+  rows: Record<Table, Record<string, any>[]> = {
+    products: [], product_costs: [], stock_moves: [], sales: [], customers: [], khata_entries: [],
+  };
   clock = 0;
   members = new Map<string, Membership>();
 
@@ -27,7 +31,8 @@ class FakeCloud {
           const key = table === 'product_costs' ? 'product_id' : 'id';
           const list = this.rows[table];
           const i = list.findIndex((r) => r[key] === row[key]);
-          if (i >= 0 && (table === 'stock_moves' || table === 'sales')) continue; // insert-only
+          const insertOnly = table === 'stock_moves' || table === 'sales' || table === 'khata_entries';
+          if (i >= 0 && insertOnly) continue;
           if (table === 'product_costs' && !this.canSeeCost(user)) throw new Error('not allowed');
           const stamp = String(++this.clock).padStart(6, '0');
           const stamped = { ...row, updated_at: stamp, synced_at: stamp };
@@ -58,6 +63,8 @@ class FakePhone implements Local {
   products = new Map<string, { meta: RemoteProduct; stock: number; cost: number }>();
   moves = new Set<string>();
   sales = new Map<string, RemoteSale>();
+  customers = new Map<string, { meta: RemoteCustomer; balance: number }>();
+  khata = new Set<string>();
   box: OutboxEntry[] = [];
   cursors = new Map<Table, string>();
   membership: Membership | null = null;
@@ -84,6 +91,21 @@ class FakePhone implements Local {
     this.move(`${id}-move`, productId, -qty, 'sale');
   }
 
+  giveUdhaar(id: string, customerId: string, amount: number) {
+    if (!this.customers.has(customerId)) {
+      const meta = { id: customerId, store_id: STORE, name: customerId, phone: '', deleted: false };
+      this.customers.set(customerId, { meta, balance: 0 });
+      this.box.push({ id: this.nextId++, kind: 'customer', row: meta });
+    }
+    this.customers.get(customerId)!.balance += amount;
+    this.khata.add(id);
+    this.box.push({
+      id: this.nextId++,
+      kind: 'khata',
+      row: { id, customer_id: customerId, amount_paise: amount, note: '', bill_id: null, created_at: 'now' },
+    });
+  }
+
   async outbox() { return [...this.box]; }
   async clearOutbox(ids: number[]) { this.box = this.box.filter((e) => !ids.includes(e.id)); }
   async cursor(t: Table) { return this.cursors.get(t) ?? null; }
@@ -103,6 +125,15 @@ class FakePhone implements Local {
     if (p) p.stock += m.delta;
   }
   async putSale(s: RemoteSale) { if (!this.sales.has(s.id)) this.sales.set(s.id, s); }
+  async putCustomer(c: RemoteCustomer) {
+    this.customers.set(c.id, { meta: c, balance: this.customers.get(c.id)?.balance ?? 0 });
+  }
+  async putKhata(k: RemoteKhataEntry) {
+    if (this.khata.has(k.id)) return;
+    this.khata.add(k.id);
+    const c = this.customers.get(k.customer_id);
+    if (c) c.balance += k.amount_paise;
+  }
   async setMembership(m: Membership) { this.membership = m; }
   async setShop() {}
 }
@@ -173,6 +204,20 @@ describe('sync between phones', () => {
     await expect(sync(a, 'staff')).resolves.toMatchObject({ pushed: 3 });
     expect(cloud.rows.product_costs).toEqual([]);
     expect(cloud.rows.products.length).toBe(1);
+  });
+
+  it('shares udhaar written on two phones, each entry once', async () => {
+    const { a, b, sync } = setup();
+    a.giveUdhaar('k1', 'ramesh', 20000);
+    await sync(a, 'owner');
+    await sync(b, 'staff');
+    b.giveUdhaar('k2', 'ramesh', -5000);
+    await sync(b, 'staff');
+    await sync(a, 'owner');
+    a.cursors.clear();
+    await sync(a, 'owner');
+    expect(a.customers.get('ramesh')!.balance).toBe(15000);
+    expect(b.customers.get('ramesh')!.balance).toBe(15000);
   });
 
   it('does nothing for someone who is not a member', async () => {

@@ -14,6 +14,7 @@
 import { findAlerts } from './alerts';
 import { answer, qtyText, resolve, unknownAnswer } from './assistant';
 import { Bill, BillLine, formatRupees, makeBill, Product } from './billing';
+import { Customer, findCustomers, nameCase, owing } from './khata';
 import { findProducts } from './names';
 import { parseNumberWord } from './numbers';
 import { Command, ItemRequest, parseCommand, tokenize } from './parse';
@@ -22,8 +23,15 @@ import { convert, Lang, parseUnit, Unit, unitLabel } from './units';
 export type Action =
   | { type: 'create'; product: Omit<Product, 'id'> }
   | { type: 'restock'; items: { productId: string; qty: number }[]; sellPaise?: number }
-  | { type: 'sell'; lines: { productId: string; qty: number; sellPaise: number; amountPaise: number }[] }
-  | { type: 'setPrice'; productId: string; sellPaise: number };
+  | {
+      type: 'sell';
+      lines: { productId: string; qty: number; sellPaise: number; amountPaise: number }[];
+      /** Bill put on a customer's khata instead of paid now. A null id opens a new khata. */
+      credit?: { customerId: string | null; name: string; amountPaise: number };
+    }
+  | { type: 'setPrice'; productId: string; sellPaise: number }
+  /** Udhaar given (positive amount) or payment received (negative). A null id opens a new khata. */
+  | { type: 'khata'; customerId: string | null; name: string; amountPaise: number };
 
 interface NewProduct {
   name: string;
@@ -43,6 +51,7 @@ type Flow =
   | { step: 'restockQty'; product: Product }
   | { step: 'keepPrice'; product: Product; qty: number }
   | { step: 'newPrice'; product: Product; qty: number }
+  | { step: 'khataAmount'; customerId: string | null; name: string; direction: 'gave' | 'got' }
   | { step: 'confirm'; action: Action };
 
 export interface ConversationState {
@@ -180,6 +189,69 @@ const A = {
     en: 'Nothing is expiring or running low.',
     hi: 'कुछ भी एक्सपायर या खत्म होने वाला नहीं है।',
     mr: 'काहीही एक्सपायर किंवा संपत आलेलं नाही.',
+  },
+};
+
+const K = {
+  confirmGave: {
+    en: (n: string, a: string, t: string) => `Write ${a} udhaar for ${n}? They will owe ${t}.`,
+    hi: (n: string, a: string, t: string) => `${n} के खाते में ${a} उधार लिखूँ? कुल ${t} बाकी होगा।`,
+    mr: (n: string, a: string, t: string) => `${n} च्या खात्यात ${a} उधार लिहू? एकूण ${t} बाकी होतील.`,
+  },
+  confirmGot: {
+    en: (n: string, a: string, t: string) => `Take ${a} from ${n}? ${t} will be left.`,
+    hi: (n: string, a: string, t: string) => `${n} से ${a} जमा करूँ? ${t} बाकी रहेगा।`,
+    mr: (n: string, a: string, t: string) => `${n} कडून ${a} जमा करू? ${t} बाकी राहतील.`,
+  },
+  newCustomer: {
+    en: (n: string, a: string) => `${n} is a new customer. Open a khata and write ${a} udhaar?`,
+    hi: (n: string, a: string) => `${n} नए ग्राहक हैं। खाता खोलकर ${a} उधार लिखूँ?`,
+    mr: (n: string, a: string) => `${n} नवीन ग्राहक आहेत. खाते उघडून ${a} उधार लिहू?`,
+  },
+  billOnCredit: {
+    en: (n: string, a: string, t: string) => `Put this ${a} bill on ${n}'s khata? They will owe ${t}.`,
+    hi: (n: string, a: string, t: string) => `यह ${a} का बिल ${n} के खाते में डालूँ? कुल ${t} बाकी होगा।`,
+    mr: (n: string, a: string, t: string) => `हे ${a} चे बिल ${n} च्या खात्यात टाकू? एकूण ${t} बाकी होतील.`,
+  },
+  billNewCustomer: {
+    en: (n: string, a: string) => `${n} is a new customer. Open a khata and put this ${a} bill on it?`,
+    hi: (n: string, a: string) => `${n} नए ग्राहक हैं। खाता खोलकर यह ${a} का बिल डालूँ?`,
+    mr: (n: string, a: string) => `${n} नवीन ग्राहक आहेत. खाते उघडून हे ${a} चे बिल टाकू?`,
+  },
+  noKhata: {
+    en: (n: string) => `There is no khata for ${n}.`,
+    hi: (n: string) => `${n} का कोई खाता नहीं है।`,
+    mr: (n: string) => `${n} चे खाते नाही.`,
+  },
+  which: {
+    en: (l: string) => `Which one? ${l}.`,
+    hi: (l: string) => `कौन से? ${l}।`,
+    mr: (l: string) => `कोणते? ${l}.`,
+  },
+  askAmount: {
+    en: (n: string) => `How much for ${n}?`,
+    hi: (n: string) => `${n} का कितना?`,
+    mr: (n: string) => `${n} चे किती?`,
+  },
+  balance: {
+    en: (n: string, a: string) => `${n} owes ${a}.`,
+    hi: (n: string, a: string) => `${n} का ${a} बाकी है।`,
+    mr: (n: string, a: string) => `${n} चे ${a} बाकी आहेत.`,
+  },
+  nothingDue: {
+    en: (n: string) => `${n} owes nothing.`,
+    hi: (n: string) => `${n} का कुछ बाकी नहीं है।`,
+    mr: (n: string) => `${n} चे काही बाकी नाही.`,
+  },
+  list: {
+    en: (l: string, t: string) => `Udhaar: ${l}. Total ${t}.`,
+    hi: (l: string, t: string) => `उधार: ${l}। कुल ${t}।`,
+    mr: (l: string, t: string) => `उधार: ${l}. एकूण ${t}.`,
+  },
+  nobody: {
+    en: 'Nobody owes anything.',
+    hi: 'किसी का उधार बाकी नहीं है।',
+    mr: 'कोणाचंही उधार बाकी नाही.',
   },
 };
 
@@ -398,7 +470,93 @@ function startSell(state: ConversationState, lang: Lang, items: ItemRequest[], p
   return confirmSale(state, lang, lines);
 }
 
-function startCommand(command: Command, state: ConversationState, products: Product[], today: Date): Turn {
+type CustomerPick = { customer: Customer | null; name: string } | { say: string };
+
+/** The customer named, a new one (customer null), or what to say if the name fits several. */
+function pickCustomer(name: string, customers: Customer[], lang: Lang): CustomerPick {
+  const matches = findCustomers(name, customers);
+  if (matches.length === 1) return { customer: matches[0], name: matches[0].name };
+  if (matches.length > 1) return { say: K.which[lang](matches.map((c) => c.name).join(sep[lang])) };
+  return { customer: null, name: nameCase(name) };
+}
+
+function confirmKhata(
+  state: ConversationState,
+  lang: Lang,
+  customer: Customer | null,
+  name: string,
+  direction: 'gave' | 'got',
+  rupees: number,
+): Turn {
+  const amountPaise = Math.round(rupees * 100);
+  const before = customer?.balancePaise ?? 0;
+  const action: Action = {
+    type: 'khata',
+    customerId: customer?.id ?? null,
+    name,
+    amountPaise: direction === 'gave' ? amountPaise : -amountPaise,
+  };
+  const amount = formatRupees(amountPaise);
+  const say = !customer
+    ? K.newCustomer[lang](name, amount)
+    : direction === 'gave'
+      ? K.confirmGave[lang](name, amount, formatRupees(before + amountPaise))
+      : K.confirmGot[lang](name, amount, formatRupees(Math.max(0, before - amountPaise)));
+  return turn(withFlow(state, lang, { step: 'confirm', action }), lang, say);
+}
+
+function startKhata(
+  command: Extract<Command, { kind: 'khataAdd' }>,
+  state: ConversationState,
+  customers: Customer[],
+): Turn {
+  const { lang, direction, rupees } = command;
+  const pick = pickCustomer(command.name, customers, lang);
+  if ('say' in pick) return turn(idle(state, lang), lang, pick.say);
+  const { customer, name } = pick;
+  // Money can only come back from someone who has a khata.
+  if (direction === 'got' && !customer) return turn(idle(state, lang), lang, K.noKhata[lang](name));
+  if (rupees !== null) return confirmKhata(state, lang, customer, name, direction, rupees);
+
+  // "Isko Ramesh ke khate mein daalo": the bill just quoted goes on udhaar.
+  const bill = state.lastBill;
+  if (direction === 'gave' && bill) {
+    const sale = billToSale(bill);
+    const amountPaise = bill.payablePaise;
+    const action: Action = { ...sale, credit: { customerId: customer?.id ?? null, name, amountPaise } };
+    const amount = formatRupees(amountPaise);
+    const say = customer
+      ? K.billOnCredit[lang](name, amount, formatRupees(customer.balancePaise + amountPaise))
+      : K.billNewCustomer[lang](name, amount);
+    return turn(withFlow(state, lang, { step: 'confirm', action }), lang, say, { bill });
+  }
+  return turn(withFlow(state, lang, { step: 'khataAmount', customerId: customer?.id ?? null, name, direction }), lang,
+    K.askAmount[lang](name));
+}
+
+function khataBalance(name: string, customers: Customer[], lang: Lang): string {
+  const pick = pickCustomer(name, customers, lang);
+  if ('say' in pick) return pick.say;
+  if (!pick.customer) return K.noKhata[lang](pick.name);
+  const due = pick.customer.balancePaise;
+  return due > 0 ? K.balance[lang](pick.name, formatRupees(due)) : K.nothingDue[lang](pick.name);
+}
+
+function khataList(customers: Customer[], lang: Lang): string {
+  const list = owing(customers);
+  if (!list.length) return K.nobody[lang];
+  const total = list.reduce((sum, c) => sum + c.balancePaise, 0);
+  const top = list.slice(0, 5).map((c) => `${c.name} ${formatRupees(c.balancePaise)}`).join(sep[lang]);
+  return K.list[lang](top, formatRupees(total));
+}
+
+function startCommand(
+  command: Command,
+  state: ConversationState,
+  products: Product[],
+  today: Date,
+  customers: Customer[],
+): Turn {
   const { lang } = command;
   switch (command.kind) {
     case 'price': {
@@ -434,6 +592,16 @@ function startCommand(command: Command, state: ConversationState, products: Prod
     }
     case 'alerts':
       return turn(idle(state, lang), lang, alertsText(command.which, products, lang, today));
+    case 'khataAdd':
+      return startKhata(command, state, customers);
+    case 'khataBalance':
+      // "Cheeni kitni baki hai" is about stock, not a customer.
+      if (!findCustomers(command.name, customers).length && findProducts(command.name, products).length) {
+        return startCommand({ kind: 'stock', lang, name: command.name }, state, products, today, customers);
+      }
+      return turn(idle(state, lang), lang, khataBalance(command.name, customers, lang));
+    case 'khataList':
+      return turn(idle(state, lang), lang, khataList(customers, lang));
     default:
       return turn(idle(state, lang), lang, unknownAnswer(lang).text);
   }
@@ -460,6 +628,7 @@ export function converse(
   state: ConversationState,
   products: Product[],
   today: Date = new Date(),
+  customers: Customer[] = [],
 ): Turn {
   const command = parseCommand(text);
   const flow = state.flow;
@@ -470,7 +639,7 @@ export function converse(
 
   switch (flow.step) {
     case 'idle':
-      return startCommand(command, state, products, today);
+      return startCommand(command, state, products, today, customers);
 
     case 'confirm':
       if (command.kind === 'yes') {
@@ -481,7 +650,7 @@ export function converse(
       if (command.kind === 'no') return cancel();
       if (command.kind === 'unknown') return turn(state, lang, T.yesOrNo[lang]);
       // Something new: drop the pending change and handle it.
-      return startCommand(command, { ...state, flow: { step: 'idle' } }, products, today);
+      return startCommand(command, { ...state, flow: { step: 'idle' } }, products, today, customers);
 
     case 'newQty': {
       if (command.kind === 'no') return cancel();
@@ -508,6 +677,13 @@ export function converse(
       const expiry = parseExpiry(text, today);
       if (!expiry) return turn(state, lang, T.askExpiry[lang]());
       return confirmNewProduct(state, lang, flow.draft, expiry);
+    }
+
+    case 'khataAmount': {
+      if (command.kind === 'no') return cancel();
+      if (number === null) return turn(state, lang, T.needNumber[lang]);
+      const customer = customers.find((c) => c.id === flow.customerId) ?? null;
+      return confirmKhata(state, lang, customer, flow.name, flow.direction, number);
     }
 
     case 'restockQty': {
@@ -552,7 +728,7 @@ export function converse(
 }
 
 /** Turn the bill on screen into a sale (the "Confirm sale" button). */
-export function billToSale(bill: Bill): Action {
+export function billToSale(bill: Bill): Extract<Action, { type: 'sell' }> {
   return {
     type: 'sell',
     lines: bill.lines.map((l) => ({
@@ -567,7 +743,7 @@ export function billToSale(bill: Bill): Action {
 
 /** The "Confirm sale" button: same as saying "bill pakka karo". */
 export function confirmLastBill(state: ConversationState, products: Product[]): Turn {
-  return startCommand({ kind: 'confirmBill', lang: state.lang }, state, products, new Date());
+  return startCommand({ kind: 'confirmBill', lang: state.lang }, state, products, new Date(), []);
 }
 
 /** True while the app is waiting for a yes or no. */

@@ -5,6 +5,7 @@
 // since the last pull. Stock travels as movements (+10 restock, -2 sale), so
 // two phones selling at once both count. Product details and prices are
 // "last change wins". Cost prices only travel for people allowed to see them.
+// Khata entries are like stock movements: added, never changed.
 //
 // This file only holds the logic; `src/data/cloud.ts` connects it to SQLite
 // on the phone and to Supabase.
@@ -50,6 +51,26 @@ export interface RemoteSale {
   synced_at?: string;
 }
 
+export interface RemoteCustomer {
+  id: string;
+  store_id: string;
+  name: string;
+  phone: string;
+  deleted: boolean;
+  updated_at?: string;
+}
+
+export interface RemoteKhataEntry {
+  id: string;
+  store_id: string;
+  customer_id: string;
+  amount_paise: number;
+  note: string;
+  bill_id: string | null;
+  created_at: string;
+  synced_at?: string;
+}
+
 export interface Membership {
   role: 'owner' | 'staff';
   name: string;
@@ -69,9 +90,11 @@ export type OutboxEntry =
   | { id: number; kind: 'product'; row: Omit<RemoteProduct, 'store_id'> }
   | { id: number; kind: 'cost'; row: Omit<RemoteCost, 'store_id'> }
   | { id: number; kind: 'move'; row: Omit<RemoteMove, 'store_id'> }
-  | { id: number; kind: 'sale'; row: Omit<RemoteSale, 'store_id'> };
+  | { id: number; kind: 'sale'; row: Omit<RemoteSale, 'store_id'> }
+  | { id: number; kind: 'customer'; row: Omit<RemoteCustomer, 'store_id'> }
+  | { id: number; kind: 'khata'; row: Omit<RemoteKhataEntry, 'store_id'> };
 
-export type Table = 'products' | 'product_costs' | 'stock_moves' | 'sales';
+export type Table = 'products' | 'product_costs' | 'stock_moves' | 'sales' | 'customers' | 'khata_entries';
 
 export interface Local {
   outbox(): Promise<OutboxEntry[]>;
@@ -85,6 +108,10 @@ export interface Local {
   applyMove(m: RemoteMove): Promise<void>;
   /** Store the sale unless it is already there. */
   putSale(s: RemoteSale): Promise<void>;
+  /** Customer details from another phone (the balance comes from khata entries). */
+  putCustomer(c: RemoteCustomer): Promise<void>;
+  /** Store the khata entry unless it is already there. */
+  putKhata(k: RemoteKhataEntry): Promise<void>;
   setMembership(m: Membership): Promise<void>;
   setShop(s: RemoteShop): Promise<void>;
 }
@@ -104,16 +131,20 @@ const TABLE_OF: Record<OutboxEntry['kind'], Table> = {
   cost: 'product_costs',
   move: 'stock_moves',
   sale: 'sales',
+  customer: 'customers',
+  khata: 'khata_entries',
 };
 
 // Parents before children, so the server's foreign keys are satisfied.
-const PUSH_ORDER: OutboxEntry['kind'][] = ['product', 'cost', 'move', 'sale'];
+const PUSH_ORDER: OutboxEntry['kind'][] = ['product', 'cost', 'customer', 'move', 'sale', 'khata'];
 
 const CURSOR_COLUMN: Record<Table, string> = {
   products: 'updated_at',
   product_costs: 'updated_at',
   stock_moves: 'synced_at',
   sales: 'synced_at',
+  customers: 'updated_at',
+  khata_entries: 'synced_at',
 };
 
 export async function push(local: Local, remote: Remote, storeId: string, canSeeCost: boolean): Promise<number> {
@@ -185,6 +216,8 @@ export async function syncOnce(local: Local, remote: Remote, storeId: string): P
   }
   pulled += await pullTable<RemoteMove>(local, remote, 'stock_moves', (m) => local.applyMove(m));
   pulled += await pullTable<RemoteSale>(local, remote, 'sales', (s) => local.putSale(s));
+  pulled += await pullTable<RemoteCustomer>(local, remote, 'customers', (c) => local.putCustomer(c));
+  pulled += await pullTable<RemoteKhataEntry>(local, remote, 'khata_entries', (k) => local.putKhata(k));
   return { pushed, pulled, membership };
 }
 

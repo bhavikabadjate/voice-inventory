@@ -25,7 +25,7 @@ import {
   type Turn,
 } from '@/core/conversation';
 import { unitLabel, type Lang } from '@/core/units';
-import { applyAction, getShop, subscribeData, todaysSalesPaise, useAccount, useProducts } from '@/data/db';
+import { applyAction, getShop, subscribeData, todaysSalesPaise, useAccount, useCustomers, useProducts } from '@/data/db';
 import { shareBill } from '@/data/share-bill';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -37,9 +37,9 @@ const LANG_LABELS: { lang: Lang; label: string }[] = [
 ];
 
 const HINTS: Record<Lang, string> = {
-  hi: 'बोलिए: "दूध कितने का है?", "पनीर ऐड करो", "2 लीटर दूध बेचा"',
-  mr: 'बोला: "दूध किती आहे?", "पनीर ऍड करा", "10 किलो साखर आली"',
-  en: 'Say: "How much is milk?", "add paneer", "sold 2 litre milk"',
+  hi: 'बोलिए: "दूध कितने का है?", "पनीर ऐड करो", "रमेश के खाते में 200 लिखो"',
+  mr: 'बोला: "दूध किती आहे?", "पनीर ऍड करा", "रमेशच्या खात्यात 200 लिहा"',
+  en: 'Say: "How much is milk?", "add paneer", "add 200 to Ramesh khata"',
 };
 
 const YES_NO: Record<Lang, [string, string]> = {
@@ -78,14 +78,17 @@ export default function AskScreen() {
   const convoRef = useRef(convo);
   const productsRef = useRef(products);
   productsRef.current = products;
+  const { customers, refresh: refreshCustomers } = useCustomers();
+  const customersRef = useRef(customers);
+  customersRef.current = customers;
   const { can } = useAccount();
   const canSeeCostRef = useRef(can.canSeeCost);
   canSeeCostRef.current = can.canSeeCost;
 
   const reload = useCallback(async () => {
-    await refresh();
+    await Promise.all([refresh(), refreshCustomers()]);
     setTodayPaise(await todaysSalesPaise(db));
-  }, [db, refresh]);
+  }, [db, refresh, refreshCustomers]);
 
   // Products may have changed on the Products tab.
   useFocusEffect(
@@ -134,7 +137,15 @@ export default function AskScreen() {
     (text: string) => {
       if (!text.trim()) return;
       setTyped('');
-      show(converse(text, { ...convoRef.current, askCost: canSeeCostRef.current }, productsRef.current));
+      show(
+        converse(
+          text,
+          { ...convoRef.current, askCost: canSeeCostRef.current },
+          productsRef.current,
+          new Date(),
+          customersRef.current,
+        ),
+      );
     },
     [show],
   );
