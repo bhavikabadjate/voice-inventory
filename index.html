@@ -4,6 +4,7 @@
 <style>
 /* Layout: one phone-width column like a counter slate. Header, three tabs, a talk thread with the bill pinned above the composer. */
 :root{
+  --on-haldi:#16241d;
   --bg:#eef3ee; --surface:#ffffff; --ink:#16241d; --muted:#5d6f65; --line:#d3ded6;
   --accent:#0f6b4f; --on-accent:#ffffff; --haldi:#e9b320; --haldi-soft:#fbf0c9; --warn:#b3401e; --me:#dcefe5;
   --display:"Baloo 2","Hind",system-ui,sans-serif; --body:"Hind",system-ui,"Noto Sans Devanagari",sans-serif;
@@ -176,6 +177,43 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
 .tabs button svg{width:22px;height:22px}
 .tabs button[aria-selected="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:none}
 @media (max-height:640px){.tile{padding:5px 2px}.tile b{font-size:.95rem}.tile small{font-size:.62rem}.tabs button{padding:3px 2px;font-size:.66rem}.tabs button svg{width:18px;height:18px}#tips{display:none}}
+/* --- round 3: sell tiles, bill steppers, pinned total, undo toast, stock search --- */
+.qgrid{flex:1 1 0;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-content:start;padding:6px 2px 2px}
+.qt{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;text-align:center;min-width:0;min-height:58px;color:var(--ink)}
+.qt b{font-weight:600;font-size:.9rem;line-height:1.2;overflow-wrap:anywhere}
+.qt small{color:var(--muted);font-size:.74rem}
+.qt i{position:absolute;top:-6px;right:-4px;background:var(--accent);color:var(--on-accent);border-radius:999px;min-width:22px;height:22px;font:700 .74rem var(--body);font-style:normal;display:grid;place-items:center;padding:0 6px}
+.qt.in{border-color:var(--accent);border-width:1.5px}
+.qt:active{transform:scale(.96)}
+#pane-sales .sellArea{flex:0 1 auto;max-height:40%}
+#pane-sales:has(#payBox:not(:empty)) .qgrid{display:none}
+#pane-sales:has(#payBox:not(:empty)) .sellArea{flex:1;max-height:none}
+#pane-sales .empty{padding:14px 12px;font-size:.9rem}
+.bill{padding:6px 10px}
+.bill td{padding:5px 3px;vertical-align:middle}
+.bill td small{color:var(--muted);font-size:.72rem;white-space:nowrap;display:block;line-height:1.1}
+.bill td:first-child{overflow-wrap:anywhere;line-height:1.2}
+.bill .qtyc{white-space:nowrap}
+.bill .qtyc button{width:30px;height:30px;border-radius:50%;border:1px solid var(--haldi);background:var(--surface);color:var(--ink);font-size:1.05rem;line-height:1;padding:0}
+.bill .qtyc span{display:inline-block;min-width:74px;text-align:center;font-weight:600;font-size:.92rem}
+.sellBar{display:flex;align-items:center;gap:8px;background:var(--haldi-soft);border:1px solid var(--haldi);border-radius:16px;padding:8px 10px 8px 14px;flex:none}
+.sellBar div{display:flex;flex-direction:column;margin-right:auto;line-height:1.1;min-width:0}
+.sellBar small{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+.sellBar b{font:700 1.4rem var(--display);font-variant-numeric:tabular-nums}
+.sellBar .btn{padding:8px 12px;font-size:.9rem;white-space:nowrap}
+.sellBar .wa{margin:0;padding:8px 10px}
+.panel.compact{padding:8px 10px;gap:6px}
+.panel.compact .dock{flex-direction:row;justify-content:center;gap:12px}
+.panel.compact .mic{width:54px;height:54px;box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 16%,transparent)}
+.panel.compact .mic svg{width:26px;height:26px}
+.panel.compact .micLabel{margin:0}
+.toast{position:fixed;left:16px;right:16px;margin-inline:auto;width:fit-content;top:calc(66px + env(safe-area-inset-top,0px));z-index:30;background:var(--ink);color:var(--bg);border-radius:999px;padding:7px 7px 7px 16px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px rgb(0 0 0/.25);max-width:calc(100vw - 32px);font-size:.92rem}
+.toast span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.toast button{border:0;border-radius:999px;background:var(--haldi);color:var(--on-haldi);font-weight:700;padding:7px 16px;flex:none}
+#stockQ{flex:1;min-width:0;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+#stockF .chip{padding:6px 10px;font-size:.82rem;white-space:nowrap}
+#stockF .chip.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+@media (max-width:380px){.qgrid{gap:6px}.sellBar .wa{display:none}}
 </style>
 <div class="app">
   <header>
@@ -210,6 +248,7 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
     <div class="row"><button class="btn go" id="voiceAdd"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg> <span id="voiceAddT">Bolkar add karo</span></button><button class="btn" id="newBtn">Add by typing</button><button class="btn" id="photoAdd" type="button">Photo</button></div>
     <input type="file" id="photoIn" accept="image/*" hidden>
     <div class="row"><span class="status" id="alerts"></span><button class="chip" type="button" id="reorderBtn" hidden>Reorder list</button></div>
+    <div class="row" style="flex-wrap:nowrap"><input id="stockQ" type="search" autocomplete="off" placeholder="Search" aria-label="Search products"><span class="chips" id="stockF" style="margin:0;flex-wrap:nowrap"></span></div>
     <details class="hist"><summary>Stock log</summary><div class="list" id="moveList"></div></details>
     <form class="form" id="edit" hidden>
       <label class="w">Name<input id="f-name" required></label>
@@ -235,7 +274,8 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
       <p class="sellSay" id="sellSay" aria-live="polite"></p>
       <div id="payBox"></div>
     </div>
-    <div class="tips" id="quick" aria-label="Tap to add to the bill"></div>
+    <div class="qgrid" id="quick" aria-label="Tap to add to the bill"></div>
+    <div class="sellBar" id="sellBar" hidden></div>
   </section>
 
   <section class="pane" id="pane-khata" hidden>
@@ -255,6 +295,7 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
     <div class="shop" id="shopBox" hidden></div>
     <p class="hint" id="shopMsg" style="color:var(--warn)"></p>
   </section>
+  <div class="toast" id="toast" hidden><span id="toastT"></span><button type="button" id="toastU">Undo</button></div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="talk" aria-selected="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg><span>Ask</span></button>
     <button role="tab" data-tab="stock" aria-selected="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Stock</span></button>
@@ -369,6 +410,10 @@ function bApply(bs,delta,exp){bs=bs.map(b=>({...b})).sort(bCmp);
 function bFit(bs,qty){const d=r3(qty-bs.reduce((a,b)=>a+b.qty,0));return d?bApply(bs,d,''):bClean(bs)}
 const tracksExp=p=>!!p.expiry||(p.batches||[]).some(b=>b.exp);
 const fmtD=d=>new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+/* After every save, a button to take it back stays up for five seconds. Saying "undo" works for longer. */
+let toastT=0;
+function showUndo(){const u=S.undo,el=$('toast');if(!u||!el)return;$('toastT').textContent=tm('सेव्ह झाले: ','Save ho gaya: ','Saved: ')+u.what;$('toastU').textContent=tm('परत घ्या','Wapas lo','Undo');el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},5000)}
+function doUndo(){const u=S.undo;$('toast').hidden=true;if(!u)return false;S.undo=null;u.run();S.undo=null;$('toast').hidden=true;say(tm(`${u.what} परत केले.`,`${u.what} wapas kar diya.`,`Undid ${u.what}.`));return true}
 /* ---------- storage ---------- */
 function snapshot(){return{products:S.products,sales:S.sales.slice(0,400),moves:S.moves.slice(0,300),customers:S.customers,khata:S.khata.slice(0,2000),shop:S.shop}}
 function restore(d){S.products=d.products||[];S.sales=d.sales||[];S.moves=d.moves||[];S.customers=d.customers||[];S.khata=d.khata||[];S.shop=d.shop||{name:'',upi:''}}
@@ -378,13 +423,13 @@ function saveProduct(p,reason,noUndo){const i=S.products.findIndex(x=>x.id===p.i
   p.batches=bFit(p.batchesSet?bOf(p):bApply(old?bOf(old):[],r3(p.qty-(old?old.qty:0)),p.addExp),p.qty);p.expiry=(p.batches.find(b=>b.exp)||{exp:''}).exp;delete p.addExp;delete p.batchesSet;const wasUndo=p._undo;delete p._undo;
   if(i<0)S.products.push(p);else S.products[i]=p;renderAll();persist();
   {const delta=Math.round((p.qty-(old?old.qty:0))*1000)/1000;if(delta){const m={pid:p.id,name:p.name,unit:p.unit,delta,after:p.qty,reason:old?(reason||'set'):'create',at:Date.now()};if(wasUndo)m.undo=true;S.moves.unshift(m);renderMoves();persist();if(db)db.collection('moves').add(m).catch(()=>{})}}
-  if(!noUndo&&reason!=='sale')S.undo={what:p.name,run:()=>old?saveProduct({...old,batchesSet:true,_undo:true},'set',true):deleteProduct(p.id)};
+  if(!noUndo&&reason!=='sale'){S.undo={what:p.name,run:()=>old?saveProduct({...old,batchesSet:true,_undo:true},'set',true):deleteProduct(p.id)};showUndo()}
   if(store)cloudSave(p,old,reason||'set');
   if(db){const {id,...d}=p;db.collection('products').doc(id).set(d).catch(e=>say('Save failed: '+(e.message||e.code)+'. Check your connection and try again.'))}}
 function deleteProduct(id){S.products=S.products.filter(p=>p.id!==id);renderAll();persist();if(db)db.collection('products').doc(id).delete().catch(()=>{});
   if(store)outbox({t:'del',id})}
 function recordSale(lines,noUndo){lines=lines.map(l=>({...l}));
-  if(!noUndo)S.undo={what:tm('विक्री','sale','the sale'),run:()=>recordSale(lines.map(l=>({...l,qty:-l.qty,amount:-l.amount})),true)};
+  if(!noUndo){S.undo={what:tm('विक्री','bikri','the sale'),run:()=>recordSale(lines.map(l=>({...l,qty:-l.qty,amount:-l.amount})),true)};showUndo()}
   const total=Math.round(lines.reduce((a,l)=>a+l.amount,0));
   for(const l of lines){const p=S.products.find(x=>x.id===l.id);if(p)saveProduct({...p,qty:Math.max(0,Math.round((p.qty-l.qty)*1000)/1000)},'sale',true)}
   if(store){const bill=nid('b'),at=new Date().toISOString(),sid=store.id;outbox({t:'sales',rows:lines.map(l=>({id:nid('s'),store_id:sid,bill_id:bill,product_id:l.id,qty:l.qty,sell_paise:Math.round(l.rate*100),amount_paise:Math.round(l.amount*100),sold_at:at}))})}
@@ -532,7 +577,7 @@ function addCustomer(name,phone){name=name.replace(/(^|\s)\S/g,m=>m.toUpperCase(
 function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,note:note||'',at:Date.now()};S.khata.unshift(e);persist();
   if(db)db.collection('khata').doc(e.id).set({cid:e.cid,amount,note:e.note,at:e.at}).catch(()=>{});
   if(store)outbox({t:'khata',row:{id:e.id,store_id:store.id,customer_id:c.id,amount_paise:Math.round(amount*100),note:e.note,created_at:new Date().toISOString()}});
-  if(!noUndo)S.undo={what:tm('खात्याची नोंद','khata entry','the khata entry'),run:()=>addKhata(c,-amount,'undo',true)};renderKhata()}
+  if(!noUndo){S.undo={what:tm('खात्याची नोंद','khata entry','the khata entry'),run:()=>addKhata(c,-amount,'undo',true)};showUndo()}renderKhata()}
 function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=numTok&&numTok.num;
   const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&!['dal','do','de','dena','dijiye','karo'].includes(x.k2)&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
   if(!nm){const l=S.customers.map(c=>[c,balance(c.id)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
@@ -811,7 +856,7 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
   const words=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep);
   if(S.pending&&pendingStep(toks,text,has))return;
   if(has(W.UNDO)&&!toks.some(x=>x.num!==undefined)){if(!S.undo)return say(tm('परत करण्यासारखे काही नाही.','Wapas karne ko kuch nahi hai.','There is nothing to undo.'));
-    const u=S.undo;S.undo=null;u.run();S.undo=null;return say(tm(`${u.what} परत केले.`,`${u.what} wapas kar diya.`,`Undid ${u.what}.`))}
+    doUndo();return}
   if(has(W.BILL)&&has(W.PAKKA))return confirmBill();
   if(has(W.EXPIRE))return expiryList();
   if(text==='#copy'){const m=S.lastMsg||'';try{await navigator.clipboard.writeText(m);return say(t('Copy ho gaya.','Copied.'))}catch(e){return say(m)}}
@@ -953,23 +998,29 @@ function expiryList(){const l=[];S.products.forEach(p=>bOf(p).forEach(b=>{if(b.e
   say(l.length?l.map(([p,b])=>`${p.name}: ${fq(b.qty,p.unit)} · ${daysTo(b.exp)<0?t('expire ho gaya','expired'):fmtD(b.exp)}`).join('\n'):tm('या आठवड्यात काही एक्सपायर होत नाही.','Is hafte kuch expire nahi ho raha.','Nothing expires this week.'))}
 
 /* ---------- rendering ---------- */
-function renderBill(){const b=$('bill');b.hidden=!S.bill.length;$('billEmpty').hidden=!!S.bill.length;if(!S.bill.length)return;
+function renderBill(){const b=$('bill'),bar=$('sellBar');b.hidden=!S.bill.length;bar.hidden=!S.bill.length;$('billEmpty').hidden=!!S.bill.length;renderQuick();if(!S.bill.length)return;
   const txt=S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
-  b.innerHTML=`<h2>${tm('बिल','Bill','Bill')}</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td><td><button type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody>
-  <tfoot><tr><td colspan="3">${tm('एकूण','Kul','Total')}</td><td class="n">${fm(billTotal())}</td><td></td></tr></tfoot></table>
-  <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">${tm('विक्री पक्की करा','Bikri pakki karo','Confirm sale')}</button><button class="btn" id="b-clear">${tm('रिकामे करा','Khali karo','Clear')}</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`;
-  b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);renderBill()});$('b-ok').onclick=()=>confirmBill();$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
-function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
-  const low=ps.filter(p=>p.low&&p.qty<=p.low).length,exp=ps.filter(p=>p.expiry&&daysTo(p.expiry)<=7).length;
+  b.innerHTML=`<table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}<small> ${fm(l.rate)}/${UL[l.unit]}</small></td><td class="n qtyc"><button type="button" data-step="-1" data-id="${esc(l.id)}" aria-label="Less ${esc(l.name)}">−</button><span>${fq(l.qty,l.unit)}</span><button type="button" data-step="1" data-id="${esc(l.id)}" aria-label="More ${esc(l.name)}">+</button></td><td class="n">${fm(l.amount)}</td><td><button type="button" class="rm" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody></table>`;
+  bar.innerHTML=`<div><small>${tm('एकूण','Kul','Total')}</small><b>${fm(billTotal())}</b></div><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a><button class="btn" id="b-clear">${tm('रिकामे','Khali','Clear')}</button><button class="btn go" id="b-ok">${tm('पक्के करा','Pakka karo','Confirm')}</button>`;
+  b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);S.forceAsk=0;renderBill()});
+  /* + and − change a line by one piece or packet, or by 250 g / 250 ml for loose goods. */
+  b.querySelectorAll('[data-step]').forEach(x=>x.onclick=()=>{const l=S.bill.find(y=>y.id===x.dataset.id);if(!l)return;const st=l.unit==='kg'||l.unit==='L'?.25:1;l.qty=r3(l.qty+st*+x.dataset.step);l.amount=Math.round(l.qty*l.rate*100)/100;if(l.qty<=0)S.bill=S.bill.filter(y=>y!==l);S.forceAsk=0;renderBill()});
+  $('b-ok').onclick=()=>confirmBill();$('b-clear').onclick=()=>{S.bill=[];S.forceAsk=0;renderBill()}}
+function renderStock(){const cost=$('costOn').checked,all=[...S.products].sort((a,b)=>a.name.localeCompare(b.name)),isLow=p=>p.low&&p.qty<=p.low,isExp=p=>p.expiry&&daysTo(p.expiry)<=7;
+  const low=all.filter(isLow).length,exp=all.filter(isExp).length,q=key2($('stockQ').value||''),f=S.sf||'all';
+  $('stockF').innerHTML=[['all',tm('सर्व','Sab','All'),all.length],['low',tm('कमी','Kam','Low'),low],['exp',tm('एक्सपायरी','Expiry','Expiring'),exp]].map(([k,l,n])=>`<button type="button" class="chip${f===k?' on':''}" data-f="${k}">${l} ${n}</button>`).join('');
+  const ps=all.filter(p=>(f==='low'?isLow(p):f==='exp'?isExp(p):true)&&(!q||[p.name,...(p.names||[])].some(n=>key2(n).includes(q)||(key($('stockQ').value).length>=3&&key(n).includes(key($('stockQ').value))))));
   $('alerts').textContent=[low&&tm(`${low} वस्तू कमी आहेत`,`${low} cheezein kam hain`,`${low} low on stock`),exp&&tm(`${exp} लवकर एक्सपायर होणार`,`${exp} jaldi expire hongi`,`${exp} expiring within a week`)].filter(Boolean).join(' · ');$('reorderBtn').hidden=!lowItems().length;
   $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?`<span class="pill">${tm('कमी','Kam','Low')}</span>`:''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?tm('एक्सपायर झाले','Expire ho gaya','Expired'):tm('एक्सपायरी ','Expiry ','Expires ')+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
    <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?tm(' · खरेदी ',' · kharid ',' · cost ')+fm(p.cost):''}</span></button>`).join('')
-   :`<p class="empty">${tm('अजून वस्तू नाहीत. "बोलून जोडा" दाबा, किंवा सांगा "साखर add करा".','Abhi koi product nahi hai. "Bolkar add karo" dabao, ya bolo "cheeni add karo".','No products yet. Tap "Add by voice", or tell the assistant "add sugar".')}</p>`}
+   :all.length?`<p class="empty">${tm('काही सापडले नाही.','Kuch nahi mila.','Nothing matches.')}</p>`:`<p class="empty">${tm('अजून वस्तू नाहीत. "बोलून जोडा" दाबा, किंवा सांगा "साखर add करा".','Abhi koi product nahi hai. "Bolkar add karo" dabao, ya bolo "cheeni add karo".','No products yet. Tap "Add by voice", or tell the assistant "add sugar".')}</p>`}
 function renderSales(){if($('home'))setTimeout(()=>renderHome(),0);const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
   $('salesHead').textContent=tm('आजची विक्री: ','Aaj ki bikri: ',"Today's sales: ")+fm(tt);
   $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):`<p class="empty">${tm('आज अजून विक्री नाही.','Aaj abhi koi bikri nahi hui.','No sales yet today.')}</p>`}
-function renderQuick(){const el=$('quick');el.innerHTML='';[...S.products].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='+ '+p.name;
-  b.onclick=()=>{addToBill([{id:p.id,name:p.name,qty:1,unit:p.unit,rate:p.sell,amount:p.sell}]);$('sellSay').textContent=`${p.name} +1 ${UL[p.unit]}. Total ${fm(billTotal())}`};el.append(b)})}
+function renderQuick(){const el=$('quick');if(!el)return;const since=Date.now()-30*864e5,sold={};S.sales.forEach(x=>{if(x.at>since)x.items.forEach(i=>sold[i.name]=(sold[i.name]||0)+1)});
+  el.innerHTML='';[...S.products].sort((a,b)=>(sold[b.name]||0)-(sold[a.name]||0)||a.name.localeCompare(b.name)).forEach(p=>{const inb=S.bill.find(l=>l.id===p.id),b=document.createElement('button');b.type='button';b.className='qt'+(inb?' in':'');
+    b.innerHTML=`<b>${esc(p.name)}</b><small>${fm(p.sell)}/${UL[p.unit]}</small>${inb?`<i>${fq(inb.qty,p.unit).replace(/ (piece|packet)$/,'')}</i>`:''}`;
+    b.onclick=()=>{addToBill([{id:p.id,name:p.name,qty:1,unit:p.unit,rate:p.sell,amount:p.sell}]);$('sellSay').textContent=''};el.append(b)})}
 const WHY={restock:['आले','Aaya','Restock'],sale:['विकले','Bika','Sale'],set:['दुरुस्ती','Sudhar','Correction'],create:['नवीन वस्तू','Naya product','New product']};
 const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(m.name)}</span><span class="p" style="font-weight:400">${tm(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+tm('आता','ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
 function renderMoves(){$('moveList').innerHTML=S.moves.length?S.moves.slice(0,60).map(moveRow).join(''):'<p class="empty">'+t('Abhi koi stock badlav nahi.','No stock changes yet.')+'</p>'}
@@ -1008,7 +1059,7 @@ try{$('costOn').checked=!!localStorage.getItem('cost');$('speakOn').checked=!!lo
 let mode='talk';
 /* Ask and Sell share one mic panel; it moves to whichever of the two tabs is open. */
 function showTab(name){document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===name));
-  ['talk','stock','sales','khata','shop'].forEach(n=>$('pane-'+n).hidden=n!==name);
+  ['talk','stock','sales','khata','shop'].forEach(n=>$('pane-'+n).hidden=n!==name);$('panel').classList.toggle('compact',name==='sales');
   if(name==='talk'||name==='sales'){mode=name;$('pane-'+name).append($('panel'));setLang(S.lang,true)}}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 /* Mic button: uses the browser's speech recognition where the page is allowed the microphone; otherwise opens the keyboard so its mic key can be used. */
@@ -1028,6 +1079,9 @@ $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechReco
 $('home').onclick=e=>{const b=e.target.closest('.tile');if(!b)return;const k=b.dataset.k;if(k==='owed')return showTab('khata');viaMic=false;handle(k==='sales'?t('aaj ka hisaab','today summary'):k==='low'?t('kya mangwana hai','reorder list'):t('kya expire hone wala hai','expiry'))};
 $('gear').onclick=e=>{e.stopPropagation();const o=$('settings');o.hidden=!o.hidden;$('gear').setAttribute('aria-expanded',!o.hidden)};
 document.addEventListener('click',e=>{const o=$('settings');if(!o.hidden&&!o.contains(e.target)&&!e.target.closest('#gear')){o.hidden=true;$('gear').setAttribute('aria-expanded','false')}});
+$('toastU').onclick=()=>doUndo();
+$('stockQ').oninput=()=>renderStock();
+$('stockF').onclick=e=>{const b=e.target.closest('[data-f]');if(b){S.sf=b.dataset.f;renderStock()}};
 $('k-scan').onclick=scanKhata;$('photoAdd').onclick=photoProduct;
 $('k-form').onsubmit=e=>{e.preventDefault();khataForm(1)};$('k-paid').onclick=()=>khataForm(-1);
 $('khataList').onclick=e=>{if(e.target.closest('a,input'))return;const sv=e.target.closest('[data-ph]');
@@ -1048,7 +1102,7 @@ function greet(){const th=$('thread'),old=th.querySelector?th.querySelector('.ms
   const el=$('tips');el.innerHTML='';c.forEach(([l,sd])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=l;b.onclick=()=>handle(sd);el.append(b)})}
 /* Every fixed label on screen, in Marathi, Hindi and English. kind: text, ph (placeholder), lab (text after a checkbox), first (text before a field). */
 const LABELS=[['[data-tab=talk] span','text','विचारा','Pucho','Ask'],['[data-tab=stock] span','text','स्टॉक','Stock','Stock'],['[data-tab=sales] span','text','विक्री','Becho','Sell'],['[data-tab=khata] span','text','खाते','Khata','Khata'],['[data-tab=shop] span','text','दुकान','Dukaan','Shop'],
- ['#speakOn','lab','आवाज','Awaaz','Speak'],['#costOn','lab','खरेदी दर','Kharid','Cost'],['#composer button','text','पाठवा','Bhejo','Send'],['#photoAdd','text','फोटो','Photo','Photo'],
+ ['#speakOn','lab','आवाज','Awaaz','Speak'],['#costOn','lab','खरेदी दर','Kharid','Cost'],['#composer button','text','पाठवा','Bhejo','Send'],['#photoAdd','text','फोटो','Photo','Photo'],['#stockQ','ph','वस्तू शोधा','Product dhoondho','Search products'],
  ['#pane-stock details.hist summary','text','स्टॉकची नोंद','Stock ka hisaab','Stock log'],['#reorderBtn','text','मागवायची यादी','Mangwane ki list','Reorder list'],
  ['#f-name','first','नाव','Naam','Name'],['#f-names','first','इतर नावे, स्वल्पविरामाने वेगळी','Doosre naam, comma se alag','Other names, comma separated'],['#f-suggest','text','नावे सुचवा','Naam sujhao','Suggest names'],
  ['#f-unit','first','युनिट','Unit','Unit'],['#f-qty','first','स्टॉकमधील प्रमाण','Stock mein kitna hai','Quantity in stock'],['#f-sell','first','विक्री दर ₹','Bechne ka rate ₹','Selling price ₹'],['#f-cost','first','खरेदी दर ₹','Kharid ka rate ₹','Cost price ₹'],

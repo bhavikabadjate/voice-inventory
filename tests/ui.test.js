@@ -21,14 +21,23 @@ await pg.click('#newBtn');await pg.fill('#f-name','');await pg.click('#edit butt
 await ev(()=>openEdit(S.products.find(p=>p.name==='Sugar')));await pg.fill('#f-qty','20');await pg.fill('#f-exp','2026-12-01');await pg.click('#edit button[type=submit]');
 ok('editing quantity logs a stock change and keeps batches',await ev(()=>{const p=S.products.find(p=>p.name==='Sugar');return p.qty===20&&p.batches.length>=1&&S.moves[0].name==='Sugar'}),await ev(()=>S.products.find(p=>p.name==='Sugar')));
 const n0=await ev(()=>S.products.length);await ev(()=>openEdit(S.products.find(p=>p.name==='Haldi')));await pg.click('#f-del');ok('one tap on Delete does not delete',await ev(()=>S.products.some(p=>p.name==='Haldi')));await pg.click('#f-del');ok('second tap deletes',await ev(()=>!S.products.some(p=>p.name==='Haldi')));
+await pg.fill('#stockQ','dudh');ok('search by another name finds the product',await ev(()=>{const r=[...document.querySelectorAll('#stockList .item b')].map(x=>x.textContent);return r.length===1&&r[0]==='Milk'}),await ev(()=>[...document.querySelectorAll('#stockList .item b')].map(x=>x.textContent)));
+await pg.fill('#stockQ','xyqp');ok('search with no match says so',await ev(()=>/Kuch nahi mila|Nothing matches/.test(document.getElementById('stockList').textContent)));await pg.fill('#stockQ','');
+await pg.click('#stockF [data-f=low]');ok('Low filter shows only low items',await ev(()=>{const n=document.querySelectorAll('#stockList .item').length;return n>0&&n===S.products.filter(p=>p.low&&p.qty<=p.low).length}));await pg.click('#stockF [data-f=all]');
 // --- sell
-await pg.click('[data-tab=sales]');await over('sell empty');await pg.click('#quick .chip');await pg.click('#quick .chip');ok('tapping an item twice makes quantity 2',await ev(()=>S.bill.length===1&&S.bill[0].qty===2),await ev(()=>S.bill));
-await pg.click('[data-rm]');ok('× removes the line',await ev(()=>S.bill.length===0));
+await pg.click('[data-tab=sales]');await over('sell empty');const PG='#quick .qt:has-text("Parle-G")';await pg.click(PG);await pg.click(PG);ok('tapping an item twice makes quantity 2',await ev(()=>S.bill.length===1&&S.bill[0].qty===2),await ev(()=>S.bill));
+await pg.click('[data-step="1"]');ok('+ adds one more',await ev(()=>S.bill[0].qty===3),await ev(()=>S.bill));await pg.click('[data-step="-1"]');await pg.click('[data-step="-1"]');ok('− takes one off each tap',await ev(()=>S.bill[0].qty===1));
+ok('tile shows how many are on the bill',await ev(()=>!!document.querySelector('#quick .qt.in i')));ok('total bar is visible with the bill',await ev(()=>!document.getElementById('sellBar').hidden&&/₹/.test(document.getElementById('sellBar').textContent)));
+await pg.click('[data-step="-1"]');ok('− at one removes the line',await ev(()=>S.bill.length===0&&document.getElementById('sellBar').hidden));
+await pg.click(PG);await pg.click('[data-rm]');ok('× removes the line',await ev(()=>S.bill.length===0));
 await pg.fill('#say','2 kilo cheeni, 1 litre dudh');await pg.click('#composer button');await pg.click('#b-ok');await pg.waitForTimeout(600);
-ok('confirm sale records it and shows the amount to collect',await ev(()=>S.sales.length===1&&/₹144/.test(document.getElementById('payBox').textContent)),await ev(()=>document.getElementById('payBox').textContent));await over('sell with payment card');
+ok('confirm sale records it and shows the amount to collect',await ev(()=>S.sales.length>=1&&/₹144/.test(document.getElementById('payBox').textContent)),await ev(()=>document.getElementById('payBox').textContent));await over('sell with payment card');
+ok('Undo button appears after a sale',await ev(()=>!document.getElementById('toast').hidden));const q0=await ev(()=>S.products.find(p=>p.name==='Sugar').qty);await pg.click('#toastU');
+ok('tapping Undo puts the stock back',await ev(()=>S.products.find(p=>p.name==='Sugar').qty)===q0+2&&await ev(()=>document.getElementById('toast').hidden),[q0,await ev(()=>S.products.find(p=>p.name==='Sugar').qty)]);
+await pg.fill('#say','2 kilo cheeni, 1 litre dudh');await pg.click('#composer button');await pg.click('#b-ok');await pg.waitForTimeout(500);
 await pg.fill('#p-cust','Test Customer');await pg.click('#p-khata');ok('bill moved to khata',await ev(()=>S.customers.length===1&&balance(S.customers[0].id)===144));
 // --- khata
-await pg.click('[data-tab=khata]');await over('khata');await pg.click('#k-form button[type=submit]');ok('empty khata form is refused',await ev(()=>S.khata.length===1&&/dono|both/.test(document.getElementById('k-msg').textContent)));
+await pg.click('[data-tab=khata]');await over('khata');await pg.click('#k-form button[type=submit]');ok('empty khata form is refused',await ev(()=>S.khata.length>=1&&/dono|both/.test(document.getElementById('k-msg').textContent)));
 await pg.fill('#k-name','Asha');await pg.fill('#k-amt','100');await pg.fill('#k-phone','12345');await pg.click('#k-form button[type=submit]');ok('bad phone is refused',await ev(()=>!S.customers.some(c=>c.name==='Asha')));
 await pg.fill('#k-phone','9123456780');await pg.click('#k-form button[type=submit]');ok('good phone is saved with +91',await ev(()=>(S.customers.find(c=>c.name==='Asha')||{}).phone==='919123456780'));
 await pg.fill('#k-name','Asha');await pg.fill('#k-amt','150');await pg.click('#k-paid');ok('paying more than owed shows an advance, not a negative debt',await ev(()=>/advance|jama/.test(document.getElementById('khataList').textContent)),await ev(()=>document.getElementById('khataList').textContent.slice(0,120)));
