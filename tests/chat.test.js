@@ -96,6 +96,12 @@ const cases=[
  ['availability: item at zero',[],['sugar ka stock 0 kilo hai','haan','cheeni hai kya'],/Sugar khatam ho gaya hai/],
  ['availability: price question is still a price answer',[],['dudh kitne ka hai'],/^.*Milk ₹56 per litre$/],
  ['availability: long chatter still gets the help line',[],['aaj mausam bahut accha lag raha yaar sach mein'],/Samajh nahi aaya/],
+ ['interrupt: a new question during add is answered',[],['milk add karo','bikri kaise badhayein?'],/Milk add karna beech mein chhod diya[\s\S]*kaafi bikri ka data nahi/,{milk:20}],
+ ['interrupt: price question during add',[],['milk add karo','cheeni kitne ka hai'],/chhod diya[\s\S]*Sugar ₹44 per kg/,{milk:20}],
+ ['interrupt: a number is still taken as the answer',[],['milk add karo','10 litre aaya','haan','haan'],/30 litre/,{milk:30}],
+ ['interrupt: gibberish twice offers cancel',[],['milk add karo','pata nahi yaar','arre bhai'],/"cancel" bolo/,{milk:20}],
+ ['interrupt: new request at the product-name question',['voiceadd'],['aaj ka hisaab'],/chhod diya[\s\S]*koi bikri nahi/],
+ ['interrupt: new request at the final confirm saves nothing',[],['milk add karo','10 litre','haan','kya mangwana hai'],/chhod diya/,{milk:20}],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`

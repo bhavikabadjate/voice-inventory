@@ -856,6 +856,11 @@ function parseDate(text){const iso=text.match(/\d{4}-\d{2}-\d{2}/);if(iso)return
 function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==undefined)||{}).num,yes=has(W.YES),no=has(W.NO);
   if(toks.some(x=>x.k2==='cancel')){S.pending=null;say(tm('ठीक आहे, रद्द केले.','Theek hai, cancel.','Okay, cancelled.'));return true}
   if(a.type==='confirm'){if(yes){S.pending=null;a.run();return true}if(no){S.pending=null;say(tm('ठीक आहे, काही सेव्ह केले नाही.','Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}S.pending=null;return false}
+  /* If the reply is not an answer to the question asked but is clearly a new request, drop the half-finished add and do the new thing. */
+  {const nm0=a.p?a.p.name:(a.name||t('product','the product')),ok={name:true,qty:num!==undefined,cost:num!==undefined,sell:num!==undefined,unit:!!toks.find(x=>x.unit)||yes,sellkeep:num!==undefined||yes||no,exp:no||!!parseDate(text),confirm:yes||no}[a.step];
+    const fresh=['ADVICE','HISAB','REORDER','KHATA','MSG','GADBAD','SELL','STOCK','KITNA','EXPIRE','UNDO','BILL','HAFTA','RATE'].some(n=>has(W[n]))||(has(W.PROFIT)&&has(W.KAISE))||(a.step!=='name'&&(has(W.ADD)||has(W.AVAIL)));
+    if(fresh&&(a.step==='name'||!ok)){S.pending=null;say(t(`${nm0} add karna beech mein chhod diya.`,`Stopped adding ${nm0}.`));return false}
+    if(!ok){a.bad=(a.bad||0)+1;if(a.bad>=2){say(t(`Yeh jawab samajh nahi aaya. ${nm0} add karna chhodna ho to "cancel" bolo.`,`I did not understand that answer. Say "cancel" to stop adding ${nm0}.`),[[t('Chhodo','Cancel'),'cancel']]);return true}}else a.bad=0}
   switch(a.step){
     case'name':{const R2=parseItems(toks,true),it=R2.items[0],nm=toks.filter((x,i)=>!R2.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','KAR'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ');
       if(it){a.p=it.p;a.exp=tracksExp(it.p)?undefined:null}else if(nm)a.name=nm;else{say(tm('वस्तूचे नाव सांगा.','Product ka naam batao.','Tell me the product name.'));return true}
