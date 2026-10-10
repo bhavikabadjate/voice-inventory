@@ -53,6 +53,9 @@ const cases=[
  ['hisaab: undone sale nets out',[],['2 litre dudh becha','haan','undo','aaj ka hisaab'],/₹0 bika, 0 bill/],
  ['reorder: nothing low',[],['kya mangwana hai'],/zaroorat nahi/],
  ['reorder: lists low items',[],['sugar ka stock 3 kilo hai','haan','kya mangwana hai'],/Sugar: 3 kg bacha/],
+ ['advice: no sales yet',[],['is hafte profit kaise badhayein'],/kaafi bikri ka data nahi/],
+ ['advice: uses own numbers',[],['2 litre dudh becha','haan','Ramesh ke khate mein 200 likho','haan','bikri kaise badhayein'],/Milk \(₹112[\s\S]*Udhaar ₹200/],
+ ['advice: does not hijack a price question',[],['dudh kitne ka hai'],/₹56 per litre/],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`
