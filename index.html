@@ -284,6 +284,7 @@ const W={SELL:K('becha bech bechi beche bechdiya sold sell vikla vikli vikle vik
  HISAB:K('hisaab hisab hishob kamai summary हिसाब हिशोब'),AAJ:K('aaj aj today आज'),BIKA:K('bika biki bikri sale sales kamaya बिका बिक्री'),REORDER:K('mangwana mangana mangvana mangao magvayche reorder order khatam मंगवाना मागवायचे'),
  ADVICE:K('salah salaah advice sujhav suggest suggestion tips badhaye badhayein badhaun badhana badhau improve grow सलाह सुझाव'),PROFIT:K('profit munafa kamai bikri business dhandha मुनाफा'),KAISE:K('kaise kese how कैसे'),
  MSG:K('message msg sandesh reminder offer status मैसेज संदेश'),HAFTA:K('hafte hafta week weekly saptah athavda athavdyacha हफ्ते आठवडा'),GADBAD:K('gadbad garbar gadbadi gadbadiya odd unusual audit jaanch chori गड़बड़ गडबड'),
+ AVAIL:K('hai hain ahe aahe available milega milta milti rakhte have है आहे'),
  KSTOP:K('likho likh likhna daalo dalo isko iska yeh ye ne kiye kiya sabse zyada jyada kiska kiski dikhao batao par pe account bill ji wale wala ab tak se liye yancha yanchi yanchya khatyat liha taka cha chi che madhe ahe'),
  STOP:K('ka ki ke hai hain mein me ko se liya aur and ani rs rupaye rupees rupay please the of much is what bhi item product kya total hua huwa per ek a for to in at de dena chahiye ahe che la update my mera of')};
 function lev(a,b){if(Math.abs(a.length-b.length)>1)return 2;const d=[...Array(b.length+1).keys()];
@@ -720,6 +721,8 @@ async function advise(question){const f=shopFacts();let ans='',viaAI=false;
 /* After a new product is added by voice, suggest other names it might be called by. */
 async function offerNames(p){if(!p)return;const list=await suggestNames(p.name,p.names);if(!list.length||!S.products.some(x=>x.id===p.id))return;S.nameOffer={pid:p.id,list};
   say(t(`${p.name} ko log aur kis naam se bolte hain? Jo sahi ho woh chuno.`,`What else do people call ${p.name}? Pick the ones that are right.`),[...list.map((n,i)=>[n,'#nm:'+i]),[t('Sab jodo','Add all'),'#nm:all',1]])}
+/* Words that mark small talk, so it is not mistaken for a question about a product. */
+const CHAT=new Set('kaisa kaisi kaise kese kyun kyu kab kahan kaun why when where who weather mausam time samay hello hi namaste thanks thank dhanyavad shukriya bye tum aap naam'.split(' ').map(key2));
 /* ---------- conversation ---------- */
 const t=(hi,en)=>S.lang==='en'?en:hi;
 /* Marathi where a translation exists; otherwise the Hindi line is used. */
@@ -810,9 +813,15 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
         if(!S.pending&&R3.items.length===1&&unk.length>=1&&unk.length<=2){const p=R3.items[0].p,nm=unk.map(x=>x.raw).join(' ');S.aliasOffer={pid:p.id,nm};
           say(t(`"${nm}" ko ${p.name} ka naam save karun? Agli baar turant samjhunga.`,`Save "${nm}" as a name for ${p.name}? Next time I will know it straight away.`),[[t('Haan, save karo','Yes, save it'),'#alias',1]])}
         return}}
+    {const unk=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k2.length>=3&&!Object.values(W).some(w=>inS(w,x))),nm=unk.map(x=>x.raw).join(' ');
+      /* A question about something the shop does not stock: say so, and offer to add it. */
+      if(unk.length&&unk.length<=2&&S.products.length&&!toks.some(x=>CHAT.has(x.k2)))return say(tm(`"${nm}" तुमच्या स्टॉकमध्ये नाही.`,`"${nm}" aapke stock mein nahi hai.`,`"${nm}" is not in your stock.`),[[t(`${nm} add karo`,`Add ${nm}`),`${nm} add karo`]])}
     return say(tm('समजले नाही. असे बोला: "2 लिटर दूध कितीला आहे?", "साखर add करा", "1 किलो साखर विकली".','Samajh nahi aaya. Aise bolo: "2 litre dudh kitne ka hai?", "cheeni add karo", "1 kilo sugar becha".','I did not catch that. Try: "price of 2 litre milk", "add sugar", "sold 1 kg sugar".'))}
   const lines=linesOf(items);if(!lines)return;
   if(lines.length===1){const l=lines[0],one=items[0].qty==null&&!items[0].unit;S.quote=lines;
+    /* "Zhadu hai?" asks whether it is in stock, so answer that as well as the price. */
+    if(one&&has(W.AVAIL)&&!has(W.KITNA)&&!has(W.RATE)){const p=items[0].p;return say(p.qty>0?tm(`हो, ${p.name} आहे: ${fq(p.qty,p.unit)} शिल्लक, ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`Haan, ${p.name} hai: ${fq(p.qty,p.unit)} bacha, ${fm(p.sell)} per ${UL[p.unit]}.`,`Yes, ${p.name} is in stock: ${fq(p.qty,p.unit)} left, ${fm(p.sell)} per ${UL[p.unit]}.`)
+      :tm(`${p.name} संपले आहे. दर ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`${p.name} khatam ho gaya hai. Rate ${fm(p.sell)} per ${UL[p.unit]}.`,`${p.name} is out of stock. Price ${fm(p.sell)} per ${UL[p.unit]}.`))}
     return say(one?`${l.name} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${l.name} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
   S.quote=lines;
   say(lines.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[tm('याचे बिल बनवा','Iska bill banao','Make this a bill'),'#bill',1]])}
