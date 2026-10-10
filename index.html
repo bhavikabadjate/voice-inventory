@@ -197,7 +197,9 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
 .bill .qtyc button{width:30px;height:30px;border-radius:50%;border:1px solid var(--haldi);background:var(--surface);color:var(--ink);font-size:1.05rem;line-height:1;padding:0}
 .bill .qtyc span{display:inline-block;min-width:74px;text-align:center;font-weight:600;font-size:.92rem}
 .sellBar{display:flex;align-items:center;gap:8px;background:var(--haldi-soft);border:1px solid var(--haldi);border-radius:16px;padding:8px 10px 8px 14px;flex:none}
-.sellBar div{display:flex;flex-direction:column;margin-right:auto;line-height:1.1;min-width:0}
+.sellBar{flex-wrap:wrap;row-gap:6px}
+.sellBar div{display:flex;flex-direction:column;margin-right:auto;line-height:1.1;flex:0 0 auto}
+.sellBar b{white-space:nowrap}
 .sellBar small{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
 .sellBar b{font:700 1.4rem var(--display);font-variant-numeric:tabular-nums}
 .sellBar .btn{padding:8px 12px;font-size:.9rem;white-space:nowrap}
@@ -213,7 +215,36 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
 #stockQ{flex:1;min-width:0;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
 #stockF .chip{padding:6px 10px;font-size:.82rem;white-space:nowrap}
 #stockF .chip.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
-@media (max-width:380px){.qgrid{gap:6px}.sellBar .wa{display:none}}
+@media (max-width:380px){.qgrid{gap:6px}}
+/* --- round 4: tables in replies, pinned answer buttons, first-run guide --- */
+.msg .rt{width:100%;border-collapse:collapse;font:400 .98rem/1.3 var(--body);font-variant-numeric:tabular-nums;margin:4px 0}
+.msg .rt td{padding:6px 2px;border-bottom:1px solid var(--line);vertical-align:top}
+.msg .rt tr:last-child td{border-bottom:0}
+.msg .rt td.n{text-align:right;font-weight:600;white-space:nowrap;padding-left:10px}
+.msg .rt small{display:block;color:var(--muted);font-size:.78rem}
+.msg .rl{font:600 1rem/1.3 var(--display)}
+.msg:has(.rt){max-width:100%;width:100%}
+.pend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pend:empty{display:none}
+.pend .btn,.pend .chip{flex:1 1 auto;font-size:1.05rem;font-weight:600;padding:11px 18px;text-align:center;min-width:88px}
+.pend .chip{color:var(--ink)}
+.guide{position:fixed;inset:0;z-index:50;background:color-mix(in srgb,var(--ink) 55%,transparent);display:grid;place-items:center;padding:16px}
+.gcard{background:var(--surface);border-radius:24px;padding:22px 20px 18px;width:min(420px,100%);max-height:100%;overflow-y:auto;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgb(0 0 0/.3)}
+.gcard h2{font:700 1.45rem/1.2 var(--display);margin:0;text-wrap:balance}
+.gcard p{margin:0;color:var(--muted);line-height:1.45}
+#gBody{display:flex;flex-direction:column;gap:12px;min-height:230px}
+.gicon{width:60px;height:60px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:700 1.7rem var(--display)}
+.glang{display:flex;flex-direction:column;gap:8px}
+.glang .btn{font-size:1.15rem;padding:12px}
+.gex{display:flex;flex-direction:column;gap:6px}
+.gex span{background:var(--me);border-radius:12px;padding:8px 12px;font-weight:500;align-self:flex-start}
+.gstart{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.gstart .btn{padding:12px;font-size:1rem}
+.gdots{display:flex;gap:6px;justify-content:center}
+.gdots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.gdots i.on{background:var(--accent);width:22px;border-radius:99px}
+#gNav{justify-content:space-between}
+#gNav .btn{padding:10px 22px}
 </style>
 <div class="app">
   <header>
@@ -224,6 +255,7 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
       <span class="seg" role="group" aria-label="Language"><button type="button" id="lang-hi" aria-pressed="true">हिंदी</button><button type="button" id="lang-mr" aria-pressed="false">मराठी</button><button type="button" id="lang-en" aria-pressed="false">English</button></span>
       <label class="tog"><input type="checkbox" id="speakOn"> Speak</label><small class="setHint" id="speakHint"></small>
       <label class="tog"><input type="checkbox" id="costOn"> Cost</label><small class="setHint" id="costHint"></small>
+      <button type="button" class="chip" id="guideBtn" style="grid-column:1/-1;justify-self:start">How to use</button>
     </div>
   </header>
 
@@ -232,6 +264,7 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
     <div class="thread" id="thread" aria-live="polite"></div>
     <div class="tips" id="tips" aria-label="Try saying"></div>
     <div class="panel" id="panel">
+    <div class="pend" id="pend"></div>
     <p class="hint" id="speakNote"></p>
     <div class="dock">
       <button class="mic" type="button" id="mic" aria-label="Tap and speak"><svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg></button>
@@ -295,6 +328,11 @@ header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
     <div class="shop" id="shopBox" hidden></div>
     <p class="hint" id="shopMsg" style="color:var(--warn)"></p>
   </section>
+  <div class="guide" id="guide" hidden role="dialog" aria-modal="true" aria-labelledby="gTitle"><div class="gcard">
+    <div id="gBody"></div>
+    <div class="gdots" id="gDots" aria-hidden="true"></div>
+    <div class="row" id="gNav"><button class="btn" type="button" id="gSkip">Skip</button><button class="btn go" type="button" id="gNext">Next</button></div>
+  </div></div>
   <div class="toast" id="toast" hidden><span id="toastT"></span><button type="button" id="toastU">Undo</button></div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="talk" aria-selected="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg><span>Ask</span></button>
@@ -807,8 +845,19 @@ const HELLO=new Set('hello hi namaste namaskar hey'.split(' ').map(key2)),THANKS
 const t=(hi,en)=>S.lang==='en'?en:hi;
 /* Marathi where a translation exists; otherwise the Hindi line is used. */
 const tm=(mr,hi,en)=>S.lang==='mr'?mr:t(hi,en);
-function say(text,chips,spoken){const d=document.createElement('div');d.className='msg bot';d.textContent=text;
-  if(chips){const c=document.createElement('div');c.className='chips';chips.forEach(([label,send,go])=>{const link=send.startsWith('https://'),b=document.createElement(link?'a':'button');b.className=go?'btn go':'chip';b.textContent=label;if(link){b.href=send;b.target='_blank';b.rel='noopener';b.style.textDecoration='none'}else{b.type='button';b.onclick=()=>handle(send)}c.append(b)});d.append(c)}
+/* A reply made of "Name: value" lines is shown as a small table, which is easier to scan than a paragraph. */
+function richBody(d,text){const lines=String(text).split('\n'),rows=lines.map(l=>{if(/^\s*(\d+\.|•)/.test(l))return null;let sub='';const body=l.replace(/\s*\(([^)]*)\)\s*$/,(m,x)=>{sub=x;return''});
+    const m=body.match(/^(.{1,40}?):\s+(.{1,24})$/)||body.match(/^(.{1,40}?)\s+(₹[\d,.]+)$/);return m?[m[1],m[2],sub]:null}),n=rows.filter(Boolean).length;
+  if(n<3||n<lines.length*.6||!d.insertAdjacentHTML){d.textContent=text;return}
+  let h='',open=false;lines.forEach((l,i)=>{const r=rows[i];if(r){if(!open){h+='<table class="rt"><tbody>';open=true}h+=`<tr><td>${esc(r[0])}${r[2]?`<small>${esc(r[2])}</small>`:''}</td><td class="n">${esc(r[1])}</td></tr>`}else{if(open){h+='</tbody></table>';open=false}if(l.trim())h+=`<div class="rl">${esc(l)}</div>`}});
+  if(open)h+='</tbody></table>';d.insertAdjacentHTML('beforeend',h)}
+function chipRow(chips,cls){const c=document.createElement('div');c.className=cls;chips.forEach(([label,send,go])=>{const link=send.startsWith('https://'),b=document.createElement(link?'a':'button');b.className=go?'btn go':'chip';b.textContent=label;if(link){b.href=send;b.target='_blank';b.rel='noopener';b.style.textDecoration='none'}else{b.type='button';b.onclick=()=>handle(send)}c.append(b)});return c}
+function say(text,chips,spoken){const d=document.createElement('div');d.className='msg bot';richBody(d,text);
+  /* When the app is waiting for an answer, its buttons sit just above the mic, large, on both the Ask and Sell tabs. */
+  const waiting=!!(S.pending||S.ambText||(S.forceAsk&&Date.now()-S.forceAsk<1500)),pend=$('pend');let pin=chips&&waiting?chips.filter(c=>!c[1].startsWith('https://')):null;
+  if(S.pending&&S.pending.type==='add'&&!(pin||[]).some(c=>c[1]==='nahi'||c[1]==='cancel'))pin=[...(pin||[]),[t('Chhodo','Cancel'),'cancel']];
+  pend.innerHTML='';if(pin&&pin.length)pend.append(...chipRow(pin,'x').childNodes);
+  const rest=chips&&!(waiting&&pin)?chips:chips?chips.filter(c=>c[1].startsWith('https://')):null;if(rest&&rest.length)d.append(chipRow(rest,'chips'));
   document.querySelectorAll('.msg.latest').forEach(x=>x.classList.remove('latest'));d.classList.add('latest');$('thread').append(d);$('thread').scrollTop=1e9;
   $('sellSay').textContent=mode==='sales'?text:'';
   if($('speakOn').checked)speak(spoken||text);else setTimeout(autoListen,500)}
@@ -838,7 +887,7 @@ function linesOf(items){const out=[];for(const it of items){
   if(q==null){say(tm(`${it.p.name} ${UL[it.p.unit]} मध्ये विकले जाते. किती ${UL[it.p.unit]}?`,`${it.p.name} ${UL[it.p.unit]} mein bikta hai. Kitna ${UL[it.p.unit]}?`,`${it.p.name} is sold by the ${UL[it.p.unit]}. How many ${UL[it.p.unit]}?`));return null}
   out.push({id:it.p.id,name:it.p.name,qty:q,unit:it.p.unit,rate:it.p.sell,amount:Math.round(q*it.p.sell*100)/100})}return out}
 
-async function handle(text,fromAI){text=text.trim();if(!text)return;
+async function handle(text,fromAI){text=text.trim();if(!text)return;$('pend').innerHTML='';if(!text.startsWith('#')){S.ambText=null;S.ambIds=null}
   if(text.startsWith('#pick:')||text==='#merge'){const o=S.ambText,ids=S.ambIds||[];S.ambText=S.ambIds=null;if(!o)return;
     if(text==='#merge'){const ps=ids.map(id=>S.products.find(p=>p.id===id)).filter(Boolean);if(ps.length>1){const a=ps[0];let n={...a,names:[...(a.names||[])]},q=a.qty;
         for(const b of ps.slice(1)){q+=b.qty;for(const nm of [b.name,...(b.names||[])])if(![n.name,...n.names].some(x=>key2(x)===key2(nm)))n.names.push(nm);deleteProduct(b.id)}
@@ -1080,6 +1129,8 @@ $('home').onclick=e=>{const b=e.target.closest('.tile');if(!b)return;const k=b.d
 $('gear').onclick=e=>{e.stopPropagation();const o=$('settings');o.hidden=!o.hidden;$('gear').setAttribute('aria-expanded',!o.hidden)};
 document.addEventListener('click',e=>{const o=$('settings');if(!o.hidden&&!o.contains(e.target)&&!e.target.closest('#gear')){o.hidden=true;$('gear').setAttribute('aria-expanded','false')}});
 $('toastU').onclick=()=>doUndo();
+$('gSkip').onclick=closeGuide;$('gNext').onclick=()=>{gStep=Math.min(3,gStep+1);renderGuide()};
+$('guideBtn').onclick=()=>{$('settings').hidden=true;openGuide()};
 $('stockQ').oninput=()=>renderStock();
 $('stockF').onclick=e=>{const b=e.target.closest('[data-f]');if(b){S.sf=b.dataset.f;renderStock()}};
 $('k-scan').onclick=scanKhata;$('photoAdd').onclick=photoProduct;
@@ -1102,7 +1153,7 @@ function greet(){const th=$('thread'),old=th.querySelector?th.querySelector('.ms
   const el=$('tips');el.innerHTML='';c.forEach(([l,sd])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=l;b.onclick=()=>handle(sd);el.append(b)})}
 /* Every fixed label on screen, in Marathi, Hindi and English. kind: text, ph (placeholder), lab (text after a checkbox), first (text before a field). */
 const LABELS=[['[data-tab=talk] span','text','विचारा','Pucho','Ask'],['[data-tab=stock] span','text','स्टॉक','Stock','Stock'],['[data-tab=sales] span','text','विक्री','Becho','Sell'],['[data-tab=khata] span','text','खाते','Khata','Khata'],['[data-tab=shop] span','text','दुकान','Dukaan','Shop'],
- ['#speakOn','lab','आवाज','Awaaz','Speak'],['#costOn','lab','खरेदी दर','Kharid','Cost'],['#composer button','text','पाठवा','Bhejo','Send'],['#photoAdd','text','फोटो','Photo','Photo'],['#stockQ','ph','वस्तू शोधा','Product dhoondho','Search products'],
+ ['#speakOn','lab','आवाज','Awaaz','Speak'],['#costOn','lab','खरेदी दर','Kharid','Cost'],['#composer button','text','पाठवा','Bhejo','Send'],['#photoAdd','text','फोटो','Photo','Photo'],['#guideBtn','text','अ‍ॅप कसे वापरायचे','App kaise chalayein','How to use the app'],['#stockQ','ph','वस्तू शोधा','Product dhoondho','Search products'],
  ['#pane-stock details.hist summary','text','स्टॉकची नोंद','Stock ka hisaab','Stock log'],['#reorderBtn','text','मागवायची यादी','Mangwane ki list','Reorder list'],
  ['#f-name','first','नाव','Naam','Name'],['#f-names','first','इतर नावे, स्वल्पविरामाने वेगळी','Doosre naam, comma se alag','Other names, comma separated'],['#f-suggest','text','नावे सुचवा','Naam sujhao','Suggest names'],
  ['#f-unit','first','युनिट','Unit','Unit'],['#f-qty','first','स्टॉकमधील प्रमाण','Stock mein kitna hai','Quantity in stock'],['#f-sell','first','विक्री दर ₹','Bechne ka rate ₹','Selling price ₹'],['#f-cost','first','खरेदी दर ₹','Kharid ka rate ₹','Cost price ₹'],
@@ -1121,6 +1172,20 @@ function applyLabels(){if(!document.querySelector)return;const i=S.lang==='mr'?2
   document.documentElement.lang=S.lang;showStatus()}
 /* The status line is written in English all over the code; this keeps a copy and shows it in the chosen language. */
 if(typeof MutationObserver!=='undefined')new MutationObserver(()=>{const el=$('status'),now=el.textContent;if(STATUS.some(([re])=>re.test(now))&&now!==el.dataset.raw){el.dataset.raw=now}else if(!el.dataset.raw)el.dataset.raw=now;showStatus()}).observe($('status'),{childList:true,characterData:true,subtree:true});
+/* ---------- first-run guide: four short screens, shown once ---------- */
+let gStep=0;
+const MICSVG='<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg>';
+function renderGuide(){const b=$('gBody'),last=gStep===3,ex=l=>`<div class="gex">${l.map(x=>`<span>“${x}”</span>`).join('')}</div>`;
+  b.innerHTML=[
+   `<h2 id="gTitle">${tm('नमस्कार! भाषा निवडा','Namaste! Bhasha chuno','Welcome! Choose a language')}</h2><div class="glang"><button type="button" data-l="hi" class="btn${S.lang==='hi'?' go':''}">हिंदी</button><button type="button" data-l="mr" class="btn${S.lang==='mr'?' go':''}">मराठी</button><button type="button" data-l="en" class="btn${S.lang==='en'?' go':''}">English</button></div><p>${tm('नंतर वरच्या बटणावरून कधीही बदलू शकता.','Baad mein upar ke button se kabhi bhi badal sakte ho.','You can change it any time from the button at the top.')}</p>`,
+   `<div class="gicon">${MICSVG}</div><h2 id="gTitle">${tm('बोला किंवा लिहा','Bolkar ya likhkar pucho','Ask by speaking or typing')}</h2><p>${tm('माइक दाबा आणि साध्या भाषेत बोला. उदाहरणार्थ:','Mic dabao aur seedhi bhasha mein bolo. Jaise:','Tap the mic and speak plainly. For example:')}</p>${ex(S.lang==='en'?['price of milk','add 10 kg sugar','add 200 to Ramesh khata']:S.lang==='mr'?['दूध कितीला आहे','10 किलो साखर आली','Ramesh ke khate mein 200 likho']:['dudh kitne ka hai','10 kilo cheeni aayi','Ramesh ke khate mein 200 likho'])}<p>${tm('माइक चालला नाही तर कीबोर्डवरील माइक वापरा.','Mic na chale to keyboard ka mic dabao.','If the mic does not work, use the mic key on your keyboard.')}</p>`,
+   `<div class="gicon">₹</div><h2 id="gTitle">${tm('बिल बनवा','Bill banao','Make a bill')}</h2><p>${tm('“विक्री” टॅबमध्ये वस्तू बोला किंवा दाबा, + आणि − ने प्रमाण बदला, मग “पक्के करा”.','“Becho” tab mein cheezein bolo ya dabao, + aur − se quantity badlo, phir “Pakka karo”.','On the Sell tab, say or tap the items, change quantity with + and −, then tap Confirm.')}</p><p>${tm('चूक झाली? 5 सेकंदात “परत घ्या” दाबा, किंवा म्हणा “galat ho gaya”.','Galti ho gayi? 5 second mein “Wapas lo” dabao, ya bolo “galat ho gaya”.','Made a mistake? Tap Undo within 5 seconds, or say “undo”.')}</p>`,
+   `<h2 id="gTitle">${tm('सुरू करूया','Shuru karein','Ready to start')}</h2><p>${tm('“दुकान” टॅबमध्ये दुकानाचे नाव आणि UPI ID टाका, म्हणजे प्रत्येक बिलासोबत QR दिसेल.','“Dukaan” tab mein dukaan ka naam aur UPI ID daalo, to har bill ke saath QR dikhega.','Add your shop name and UPI ID in the Shop tab so every bill shows a payment QR.')}</p><div class="gstart">${store||S.products.length>3?'':`<button type="button" class="btn" id="gSample">${tm('नमुना डेटासह पाहा','Namoona data ke saath aazmao','Try it with example data')}</button>`}<button type="button" class="btn go" id="gGo">${tm('माझ्या दुकानापासून सुरू करा','Apni dukaan se shuru karo','Start with my own shop')}</button></div>`][gStep];
+  $('gDots').innerHTML=[0,1,2,3].map(i=>`<i class="${i===gStep?'on':''}"></i>`).join('');$('gNav').hidden=last;$('gSkip').textContent=tm('वगळा','Chhodo','Skip');$('gNext').textContent=tm('पुढे','Aage','Next');
+  b.querySelectorAll('[data-l]').forEach(x=>x.onclick=()=>{setLang(x.dataset.l,true);greet();renderGuide()});
+  if($('gSample'))$('gSample').onclick=()=>{loadSamples();closeGuide()};if($('gGo'))$('gGo').onclick=closeGuide}
+function openGuide(){gStep=0;$('guide').hidden=false;renderGuide()}
+function closeGuide(){$('guide').hidden=true;try{localStorage.setItem('guided','1')}catch(e){}}
 /* The language switch sets what the mic listens for, the reply language and the voice. */
 function setLang(l,quiet){S.lang=l;try{localStorage.setItem('lang',l)}catch(e){}
   $('lang-hi').setAttribute('aria-pressed',l==='hi');$('lang-mr').setAttribute('aria-pressed',l==='mr');$('lang-en').setAttribute('aria-pressed',l==='en');
@@ -1131,6 +1196,7 @@ function setLang(l,quiet){S.lang=l;try{localStorage.setItem('lang',l)}catch(e){}
 $('lang-hi').onclick=()=>setLang('hi');$('lang-mr').onclick=()=>setLang('mr');$('lang-en').onclick=()=>setLang('en');
 let L0='hi';try{L0=localStorage.getItem('lang')||'hi'}catch(e){}
 setLang(L0,true);greet();
+try{if(localStorage.getItem('guided')!=='1'){localStorage.setItem('guide-check','1');openGuide()}}catch(e){}
 (async()=>{const c=window.claude;
   try{db=c?await c.use('db'):null}catch(e){db=null}
   try{sample=c?await c.use('sample'):null}catch(e){sample=null}

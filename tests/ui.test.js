@@ -1,10 +1,19 @@
-// Browser checks: forms, bill, khata, shop details, reload, dark mode, screen sizes.
+// Browser checks: guide, forms, bill, khata, shop details, reload, dark mode, screen sizes.
 // Usage: serve this folder on port 8765 (python3 -m http.server 8765), then: node tests/ui.test.js  (needs playwright)
 const {chromium}=require('playwright');(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'}).catch(()=>chromium.launch());
 const ctx=await b.newContext({viewport:{width:360,height:640}});const pg=await ctx.newPage();const errs=[];pg.on('pageerror',e=>errs.push('PAGEERR '+e.message));
 const R=[];const ok=(n,c,d)=>R.push((c?'ok   ':'FAIL ')+n+(c?'':' → '+JSON.stringify(d)));
 const ev=f=>pg.evaluate(f);const over=async n=>ok('no sideways scroll: '+n,await ev(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight+1),await ev(()=>[document.documentElement.scrollWidth,innerWidth,document.documentElement.scrollHeight,innerHeight]));
 await pg.goto('http://localhost:8765/index.html');await pg.waitForTimeout(2500);
+ok('guide opens on first visit',await ev(()=>!document.getElementById('guide').hidden&&/Bhasha|language|भाषा/.test(document.getElementById('gBody').textContent)));
+await pg.click('#gBody [data-l=en]');ok('choosing English in the guide switches the app',await ev(()=>S.lang==='en'&&/Welcome/.test(document.getElementById('gBody').textContent)));await pg.click('#gBody [data-l=hi]');
+await pg.click('#gNext');await pg.click('#gNext');await pg.click('#gNext');ok('last guide screen offers example data or own shop',await ev(()=>!!document.getElementById('gGo')&&document.getElementById('gNav').hidden));
+await pg.click('#gGo');ok('guide closes',await ev(()=>document.getElementById('guide').hidden));
+await pg.fill('#say','sab ka stock');await pg.click('#composer button');ok('a list reply is drawn as a table',await ev(()=>document.querySelectorAll('.msg.latest .rt tr').length>=5),await ev(()=>document.querySelector('.msg.latest').innerHTML.slice(0,200)));
+await pg.fill('#say','cheeni ka rate 46 karo');await pg.click('#composer button');ok('yes and no are pinned above the mic',await ev(()=>document.querySelectorAll('#pend button').length===2&&!document.querySelector('.msg.latest .chips')));
+await pg.click('#pend button');ok('tapping the pinned yes saves and clears the buttons',await ev(()=>S.products.find(p=>p.name==='Sugar').sell===46&&!document.querySelector('#pend button')));
+await pg.fill('#say','cheeni ka rate 44 karo');await pg.click('#composer button');await pg.click('#pend button');
+await pg.fill('#say','besan add karo');await pg.click('#composer button');ok('an add question shows a pinned Cancel',await ev(()=>[...document.querySelectorAll('#pend button')].some(b=>/Chhodo|Cancel/.test(b.textContent))));await pg.click('#pend button');ok('pinned Cancel stops the add',await ev(()=>!S.pending));
 await over('ask 360x640');
 // --- stock form
 await pg.click('[data-tab=stock]');await over('stock');
@@ -47,6 +56,7 @@ await pg.fill('#i-upi','test@okaxis');await pg.click('#i-form button[type=submit
 await pg.click('[data-tab=sales]');await pg.fill('#say','1 kilo cheeni');await pg.click('#composer button');await pg.click('#b-ok');await pg.waitForTimeout(900);ok('QR is drawn once a UPI ID is set',await ev(()=>!!document.querySelector('#payBox .qr svg')));
 // --- reload keeps everything
 const before=await ev(()=>JSON.stringify([S.products.length,S.sales.length,S.khata.length,S.shop.upi,S.moves.length]));await pg.reload();await pg.waitForTimeout(2500);
+ok('guide does not come back after a reload',await ev(()=>document.getElementById('guide').hidden));
 ok('everything is still there after reloading the page',before===await ev(()=>JSON.stringify([S.products.length,S.sales.length,S.khata.length,S.shop.upi,S.moves.length])),before);
 // --- dark mode, wide and tiny screens
 await pg.emulateMedia({colorScheme:'dark'});await pg.click('[data-tab=talk]');await pg.fill('#say','aaj ka hisaab');await pg.click('#composer button');await pg.screenshot({path:'ui-dark.png'});
