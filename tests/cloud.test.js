@@ -12,7 +12,7 @@ function fake(opts){const T={products:[],product_costs:[],stock_moves:[],sales:[
   const missing=t=>opts.noKhata&&(t==='customers'||t==='khata_entries');
   const q=(t)=>{let rows=()=>T[t],res=null;const key=t==='product_costs'?'product_id':'id';
     const run=()=>{if(opts.offline)return{data:null,error:{message:'TypeError: Failed to fetch'}};if(missing(t))return{data:null,error:{code:'PGRST205',message:"Could not find the table 'public."+t+"' in the schema cache"}};return res||{data:rows().slice(),error:null}};
-    const api={select(){return api},eq(c,v){const prev=rows;rows=()=>prev().filter(r=>r[c]===v);return api},order(){return api},range(){return api},limit(){return api},
+    const api={select(){return api},eq(c,v){const prev=rows;rows=()=>prev().filter(r=>r[c]===v);return api},order(){return api},gte(){return api},range(){return api},limit(){return api},
       single(){const r=run();return Promise.resolve(r.error?r:{data:r.data[0]||null,error:null})},maybeSingle(){return api.single()},
       upsert(row,o){if(!opts.offline&&!missing(t))[].concat(row).forEach(r=>{const i=T[t].findIndex(x=>x[key]===r[key]);if(i<0)T[t].push({...r});else if(!(o&&o.ignoreDuplicates))T[t][i]={...T[t][i],...r}});res={data:null,error:null};return api},
       update(patch){const prev=rows;if(!opts.offline)setTimeout(()=>0);api._patch=patch;const fin=api.eq;api.eq=(c,v)=>{T[t].filter(r=>r[c]===v).forEach(r=>Object.assign(r,patch));res={data:null,error:null};return api};return api},
