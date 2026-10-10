@@ -10,7 +10,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { formatRupees, type Product } from '@/core/billing';
 import { findProducts } from '@/core/names';
 import { unitLabel, type Unit } from '@/core/units';
-import { deleteProduct, newProductId, saveProduct, useProducts } from '@/data/db';
+import { deleteProduct, newProductId, saveProduct, useAccount, useProducts } from '@/data/db';
 import { SAMPLE_PRODUCTS } from '@/data/samples';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -57,6 +57,7 @@ function toPaise(text: string): number {
 export default function ProductsScreen() {
   const theme = useTheme();
   const { db, products, refresh } = useProducts();
+  const { can } = useAccount();
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
 
@@ -132,7 +133,9 @@ export default function ProductsScreen() {
             </View>
             <View style={styles.row}>
               <Field label="Selling price ₹" value={draft.sell} onChangeText={(sell) => set({ sell })} keyboardType="decimal-pad" placeholder="56" />
-              <Field label="Cost price ₹ (never spoken)" value={draft.cost} onChangeText={(cost) => set({ cost })} keyboardType="decimal-pad" placeholder="48" />
+              {can.canSeeCost ? (
+                <Field label="Cost price ₹ (never spoken)" value={draft.cost} onChangeText={(cost) => set({ cost })} keyboardType="decimal-pad" placeholder="48" />
+              ) : null}
             </View>
             <View style={styles.row}>
               <Field label={`Stock (${unitLabel(draft.unit)})`} value={draft.stock} onChangeText={(stock) => set({ stock })} keyboardType="decimal-pad" placeholder="20" />
@@ -149,7 +152,7 @@ export default function ProductsScreen() {
             </View>
             <Button title="Save" onPress={save} />
             <Button title="Cancel" kind="secondary" onPress={() => setDraft(null)} />
-            {draft.id ? <Button title="Delete" kind="danger" onPress={remove} /> : null}
+            {draft.id && can.canDelete ? <Button title="Delete" kind="danger" onPress={remove} /> : null}
           </View>
         </SafeAreaView>
       </View>
@@ -196,7 +199,8 @@ export default function ProductsScreen() {
                   {formatRupees(item.sellPaise)} / {unitLabel(item.unit)}
                 </Text>
                 <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Stock {item.stock} · Cost {formatRupees(item.costPaise)}
+                  Stock {item.stock}
+                  {can.canSeeCost ? ` · Cost ${formatRupees(item.costPaise)}` : ''}
                 </Text>
               </View>
             </Pressable>

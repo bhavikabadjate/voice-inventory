@@ -8,7 +8,7 @@
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ import {
   type Turn,
 } from '@/core/conversation';
 import { unitLabel, type Lang } from '@/core/units';
-import { applyAction, getShop, todaysSalesPaise, useProducts } from '@/data/db';
+import { applyAction, getShop, subscribeData, todaysSalesPaise, useAccount, useProducts } from '@/data/db';
 import { shareBill } from '@/data/share-bill';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -78,6 +78,9 @@ export default function AskScreen() {
   const convoRef = useRef(convo);
   const productsRef = useRef(products);
   productsRef.current = products;
+  const { can } = useAccount();
+  const canSeeCostRef = useRef(can.canSeeCost);
+  canSeeCostRef.current = can.canSeeCost;
 
   const reload = useCallback(async () => {
     await refresh();
@@ -90,6 +93,9 @@ export default function AskScreen() {
       reload();
     }, [reload]),
   );
+
+  // Sales made on other phones arrive with a sync.
+  useEffect(() => subscribeData(() => void todaysSalesPaise(db).then(setTodayPaise)), [db]);
 
   const startListening = useCallback(async () => {
     setError('');
@@ -128,7 +134,7 @@ export default function AskScreen() {
     (text: string) => {
       if (!text.trim()) return;
       setTyped('');
-      show(converse(text, convoRef.current, productsRef.current));
+      show(converse(text, { ...convoRef.current, askCost: canSeeCostRef.current }, productsRef.current));
     },
     [show],
   );

@@ -46,6 +46,13 @@ describe('adding a new product', () => {
     expect(turns[6].action).toMatchObject({ type: 'create', product: { unit: 'custom:packet', expiry: '2026-10-15' } });
   });
 
+  it('never asks or says the cost to staff who may not see it', () => {
+    const turns = talk(['Paneer add karo', '2 kilo', '360', 'nahi', 'haan'], { ...initialState, askCost: false });
+    expect(turns[1].say).toBe('बेचने का रेट कितना है, प्रति किलो?');
+    expect(turns[3].say).toBe('Paneer, 2 किलो, बिक्री ₹360। सेव करूँ?');
+    expect(turns[4].action).toMatchObject({ type: 'create', product: { costPaise: 0, sellPaise: 36000 } });
+  });
+
   it('can be cancelled', () => {
     const turns = talk(['Paneer add karo', 'nahi']);
     expect(turns[1].say).toBe('ठीक है, रद्द कर दिया।');
