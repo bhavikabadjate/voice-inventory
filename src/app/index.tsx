@@ -1,20 +1,30 @@
-// Ask screen: tap the mic, ask "milk kitne ka hai?" or "1 litre milk aur
-// 2 kilo cheeni ka kitna hua?", and hear the selling price or bill total.
+// Ask screen: the voice assistant. Tap the mic and talk:
+//   "milk kitne ka hai?"                 → selling price
+//   "1 litre milk aur 2 kilo cheeni"     → bill with total, then "bill pakka karo"
+//   "paneer add karo"                    → asks quantity, cost, selling price, expiry
+//   "10 kilo cheeni aayi" / "2 litre dudh becha" / "dudh ka rate 58 kar do"
+// When the app asks a question it starts listening again by itself.
 
 import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Accent, Button, Chip, Field } from '@/components/ui';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { answer, type Answer } from '@/core/assistant';
 import { formatRupees } from '@/core/billing';
-import { parseCommand } from '@/core/parse';
+import {
+  awaitingYesNo,
+  confirmLastBill,
+  converse,
+  initialState,
+  type ConversationState,
+  type Turn,
+} from '@/core/conversation';
 import { unitLabel, type Lang } from '@/core/units';
-import { useProducts } from '@/data/db';
+import { applyAction, todaysSalesPaise, useProducts } from '@/data/db';
 import { useTheme } from '@/hooks/use-theme';
 
 const LOCALES: Record<Lang, string> = { hi: 'hi-IN', mr: 'mr-IN', en: 'en-IN' };
@@ -25,37 +35,91 @@ const LANG_LABELS: { lang: Lang; label: string }[] = [
 ];
 
 const HINTS: Record<Lang, string> = {
-  hi: 'बोलिए: "दूध कितने का है?" या "1 लीटर दूध और 2 किलो चीनी का कितना हुआ?"',
-  mr: 'बोला: "दूध किती आहे?" किंवा "150 ग्रॅम नाचणी किती?"',
-  en: 'Say: "How much is milk?" or "2 litre milk and 1 kg sugar"',
+  hi: 'बोलिए: "दूध कितने का है?", "पनीर ऐड करो", "2 लीटर दूध बेचा"',
+  mr: 'बोला: "दूध किती आहे?", "पनीर ऍड करा", "10 किलो साखर आली"',
+  en: 'Say: "How much is milk?", "add paneer", "sold 2 litre milk"',
+};
+
+const YES_NO: Record<Lang, [string, string]> = {
+  hi: ['हाँ', 'नहीं'],
+  mr: ['हो', 'नाही'],
+  en: ['Yes', 'No'],
+};
+
+const LABELS: Record<Lang, { confirmSale: string; today: string; total: string }> = {
+  hi: { confirmSale: 'बिक्री पक्की करें', today: 'आज की बिक्री', total: 'कुल' },
+  mr: { confirmSale: 'विक्री पक्की करा', today: 'आजची विक्री', total: 'एकूण' },
+  en: { confirmSale: 'Confirm sale', today: "Today's sales", total: 'Total' },
 };
 
 export default function AskScreen() {
   const theme = useTheme();
-  const { products, refresh } = useProducts();
+  const { db, products, refresh } = useProducts();
   const [lang, setLang] = useState<Lang>('hi');
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState('');
   const [typed, setTyped] = useState('');
-  const [reply, setReply] = useState<Answer | null>(null);
+  const [reply, setReply] = useState<Turn | null>(null);
   const [error, setError] = useState('');
+  const [todayPaise, setTodayPaise] = useState(0);
+  const [convo, setConvo] = useState<ConversationState>(initialState);
+  // Speech events fire outside React's render cycle, so keep the latest state in a ref.
+  const convoRef = useRef(convo);
+  const productsRef = useRef(products);
+  productsRef.current = products;
+
+  const reload = useCallback(async () => {
+    await refresh();
+    setTodayPaise(await todaysSalesPaise(db));
+  }, [db, refresh]);
 
   // Products may have changed on the Products tab.
   useFocusEffect(
     useCallback(() => {
-      refresh();
-    }, [refresh]),
+      reload();
+    }, [reload]),
+  );
+
+  const startListening = useCallback(async () => {
+    setError('');
+    const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!permission.granted) {
+      setError('Microphone permission is needed to talk to the app.');
+      return;
+    }
+    Speech.stop();
+    setHeard('');
+    ExpoSpeechRecognitionModule.start({ lang: LOCALES[lang], interimResults: true });
+  }, [lang]);
+
+  const show = useCallback(
+    async (turn: Turn) => {
+      convoRef.current = turn.state;
+      setConvo(turn.state);
+      setReply(turn);
+      if (turn.action) {
+        await applyAction(db, turn.action);
+        await reload();
+      }
+      Speech.stop();
+      Speech.speak(turn.say, {
+        language: LOCALES[turn.lang],
+        // The app asked something: listen for the answer.
+        onDone: () => {
+          if (turn.state.flow.step !== 'idle') startListening();
+        },
+      });
+    },
+    [db, reload, startListening],
   );
 
   const respond = useCallback(
     (text: string) => {
       if (!text.trim()) return;
-      const result = answer(parseCommand(text), products);
-      setReply(result);
-      Speech.stop();
-      Speech.speak(result.text, { language: LOCALES[result.lang] });
+      setTyped('');
+      show(converse(text, convoRef.current, productsRef.current));
     },
-    [products],
+    [show],
   );
 
   useSpeechRecognitionEvent('start', () => setListening(true));
@@ -70,22 +134,14 @@ export default function AskScreen() {
     if (event.error !== 'no-speech' && event.error !== 'aborted') setError(event.message);
   });
 
-  const toggleMic = async () => {
-    setError('');
-    if (listening) {
-      ExpoSpeechRecognitionModule.stop();
-      return;
-    }
-    const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-    if (!permission.granted) {
-      setError('Microphone permission is needed to ask by voice.');
-      return;
-    }
-    Speech.stop();
-    setHeard('');
-    setReply(null);
-    ExpoSpeechRecognitionModule.start({ lang: LOCALES[lang], interimResults: true });
+  const toggleMic = () => {
+    if (listening) ExpoSpeechRecognitionModule.stop();
+    else startListening();
   };
+
+  const replyLang = reply?.lang ?? lang;
+  const bill = reply?.bill ?? null;
+  const canConfirmSale = convo.flow.step === 'idle' && convo.lastBill !== null && bill === convo.lastBill;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -96,17 +152,20 @@ export default function AskScreen() {
               <Chip key={l.lang} label={l.label} selected={lang === l.lang} onPress={() => setLang(l.lang)} />
             ))}
           </View>
+          <Text style={[styles.hint, { color: theme.textSecondary }]}>
+            {LABELS[lang].today}: {formatRupees(todayPaise)}
+          </Text>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={listening ? 'Stop listening' : 'Ask by voice'}
+            accessibilityLabel={listening ? 'Stop listening' : 'Talk'}
             onPress={toggleMic}
             style={({ pressed }) => [
               styles.mic,
               { backgroundColor: listening ? '#D93F3F' : Accent, opacity: pressed ? 0.8 : 1 },
             ]}>
             <Text style={styles.micIcon}>{listening ? '■' : '🎤'}</Text>
-            <Text style={styles.micText}>{listening ? 'Listening…' : 'Tap and ask'}</Text>
+            <Text style={styles.micText}>{listening ? 'Listening…' : 'Tap and talk'}</Text>
           </Pressable>
 
           <Text style={[styles.hint, { color: theme.textSecondary }]}>{HINTS[lang]}</Text>
@@ -116,16 +175,14 @@ export default function AskScreen() {
 
           {reply ? (
             <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-              <Text style={[styles.answer, { color: theme.text }]}>{reply.text}</Text>
-              {reply.kind === 'price' && reply.bill && reply.bill.lines.length > 1 ? (
+              <Text style={[styles.answer, { color: theme.text }]}>{reply.say}</Text>
+              {bill && bill.lines.length > 1 ? (
                 <View style={styles.bill}>
-                  {reply.bill.lines.map((line, i) => (
+                  {bill.lines.map((line, i) => (
                     <View key={i} style={styles.billRow}>
-                      <Text style={[styles.billItem, { color: theme.text }]}>
-                        {line.product.names[0]}
-                      </Text>
+                      <Text style={[styles.billItem, { color: theme.text }]}>{line.product.names[0]}</Text>
                       <Text style={[styles.billQty, { color: theme.textSecondary }]}>
-                        {line.qty} {unitLabel(line.unit, reply.lang)}
+                        {line.qty} {unitLabel(line.unit, replyLang)}
                       </Text>
                       <Text style={[styles.billAmount, { color: theme.text }]}>
                         {formatRupees(line.amountPaise)}
@@ -133,25 +190,43 @@ export default function AskScreen() {
                     </View>
                   ))}
                   <View style={[styles.billRow, styles.billTotal]}>
-                    <Text style={[styles.billItem, styles.bold, { color: theme.text }]}>Total</Text>
+                    <Text style={[styles.billItem, styles.bold, { color: theme.text }]}>
+                      {LABELS[replyLang].total}
+                    </Text>
                     <Text style={[styles.billAmount, styles.bold, { color: theme.text }]}>
-                      {formatRupees(reply.bill.payablePaise)}
+                      {formatRupees(bill.payablePaise)}
                     </Text>
                   </View>
                 </View>
+              ) : null}
+              {awaitingYesNo(convo) ? (
+                <View style={styles.row}>
+                  <View style={styles.flex}>
+                    <Button title={YES_NO[replyLang][0]} onPress={() => respond('yes')} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Button title={YES_NO[replyLang][1]} kind="secondary" onPress={() => respond('no')} />
+                  </View>
+                </View>
+              ) : null}
+              {canConfirmSale ? (
+                <Button
+                  title={LABELS[replyLang].confirmSale}
+                  onPress={() => show(confirmLastBill(convoRef.current, productsRef.current))}
+                />
               ) : null}
             </View>
           ) : null}
 
           {products.length === 0 ? (
             <Text style={[styles.hint, { color: theme.textSecondary }]}>
-              No products yet. Add some on the Products tab first.
+              No products yet. Say "paneer add karo", or add them on the Products tab.
             </Text>
           ) : null}
 
           <View style={styles.typeRow}>
             <Field
-              label="Or type a question"
+              label="Or type"
               value={typed}
               onChangeText={setTyped}
               placeholder="2 ltr milk kitne ka hai"
@@ -159,7 +234,7 @@ export default function AskScreen() {
               onSubmitEditing={() => respond(typed)}
             />
           </View>
-          <Button title="Ask" kind="secondary" onPress={() => respond(typed)} disabled={!typed.trim()} />
+          <Button title="Send" kind="secondary" onPress={() => respond(typed)} disabled={!typed.trim()} />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -199,4 +274,5 @@ const styles = StyleSheet.create({
   billTotal: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#888', paddingTop: Spacing.two },
   bold: { fontWeight: '700' },
   typeRow: { flexDirection: 'row' },
+  flex: { flex: 1 },
 });
