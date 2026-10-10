@@ -25,6 +25,9 @@ header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
 h1{font:700 1.7rem/1 var(--display);margin:0;color:var(--accent)}
 h1 span{color:var(--haldi)}
 .status{font-size:.8rem;color:var(--muted)}
+.seg{display:inline-flex;border:1.5px solid var(--accent);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:none;padding:4px 12px;font-weight:600;font-size:.9rem}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
 .tabs{display:flex;gap:6px;border-bottom:2px solid var(--line)}
 .tabs button{background:none;border:0;padding:8px 12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
 .tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--haldi)}
@@ -72,6 +75,7 @@ a{color:var(--accent)}
   <header>
     <h1>Bolo <span>Dukaan</span></h1>
     <div class="row">
+      <span class="seg" role="group" aria-label="Language"><button type="button" id="lang-hi" aria-pressed="true">हिंदी</button><button type="button" id="lang-en" aria-pressed="false">English</button></span>
       <span class="status" id="status">Connecting…</span>
       <label class="status"><input type="checkbox" id="speakOn"> Speak</label>
       <label class="status"><input type="checkbox" id="costOn"> Show cost</label>
@@ -237,7 +241,6 @@ function linesOf(items){const out=[];for(const it of items){const q=toBase(it.qt
 async function handle(text,fromAI){text=text.trim();if(!text)return;if(!fromAI)me(text);
   const toks=tokenize(text),has=s=>toks.some(x=>inS(s,x));
   const words=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep);
-  if(words.length>=2||!S.pending)S.lang=(/[ऀ-ॿ]/.test(text)||has(W.HI))?'hi':(words.length?'en':S.lang);
   if(S.pending&&pendingStep(toks,text,has))return;
   if(has(W.BILL)&&has(W.PAKKA))return confirmBill();
   if(has(W.EXPIRE))return expiryList();
@@ -353,17 +356,27 @@ $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechReco
   if(listening&&rec){try{rec.stop()}catch(e){}return}
   if(!SR)return micFallback('This browser has no built-in voice typing.');
   try{rec=new SR();rec.lang=S.lang==='en'?'en-IN':'hi-IN';rec.interimResults=true;rec.maxAlternatives=1;let fin='',got=false;
-    rec.onstart=()=>{listening=true;$('mic').classList.add('on');$('speakNote').textContent='';$('micLabel').textContent='Sun raha hoon…'};
+    rec.onstart=()=>{listening=true;$('mic').classList.add('on');$('speakNote').textContent='';$('micLabel').textContent=t('Sun raha hoon…','Listening…')};
     rec.onresult=e=>{got=true;let t='';for(const r of e.results){t+=r[0].transcript;if(r.isFinal)fin=t}$('say').value=t};
-    rec.onerror=e=>{if(e.error==='no-speech')$('speakNote').textContent='Kuch sunai nahi diya. Dobara mic dabao.';
+    rec.onerror=e=>{if(e.error==='no-speech')$('speakNote').textContent=t('Kuch sunai nahi diya. Dobara mic dabao.','I did not hear anything. Tap the mic again.');
       else if(e.error!=='aborted')micFallback(e.error==='not-allowed'||e.error==='service-not-allowed'?'The microphone is blocked for this page.':'Voice typing failed ('+e.error+').')};
-    rec.onend=()=>{listening=false;$('mic').classList.remove('on');$('micLabel').textContent='Tap karke bolo';
+    rec.onend=()=>{listening=false;$('mic').classList.remove('on');$('micLabel').textContent=t('Tap karke bolo','Tap and speak');
       const v=(fin||(got?$('say').value:'')).trim();if(v){$('say').value='';handle(v)}};
     rec.start()}catch(e){micFallback('The microphone could not start.')}};
 $('composer').onsubmit=e=>{e.preventDefault();const v=$('say').value;$('say').value='';handle(v)};
 
 renderAll();
-say('Namaste! Kuch bhi pucho ya batao.',[['Dudh kitne ka hai?','dudh kitne ka hai?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']]);
+function greet(){say(t('Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell me anything about the shop.'),S.lang==='en'?
+  [['Price of milk?','price of milk'],['1 litre milk and 2 kg sugar','1 litre milk and 2 kg sugar total'],['How much sugar is left?','how much sugar is left'],['Add ragi','add ragi']]:
+  [['Dudh kitne ka hai?','dudh kitne ka hai?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']])}
+/* The language switch sets what the mic listens for, the reply language and the voice. */
+function setLang(l,quiet){S.lang=l;try{localStorage.setItem('lang',l)}catch(e){}
+  $('lang-hi').setAttribute('aria-pressed',l==='hi');$('lang-en').setAttribute('aria-pressed',l==='en');
+  $('micLabel').textContent=t('Tap karke bolo','Tap and speak');$('say').placeholder=t('Ya yahan likho: 2 litre dudh kitne ka hai?','Or type here: price of 2 litre milk');
+  if(listening&&rec){try{rec.abort()}catch(e){}}if(!quiet)greet()}
+$('lang-hi').onclick=()=>setLang('hi');$('lang-en').onclick=()=>setLang('en');
+let L0='hi';try{L0=localStorage.getItem('lang')||'hi'}catch(e){}
+setLang(L0,true);greet();
 (async()=>{const c=window.claude;
   try{db=c?await c.use('db'):null}catch(e){db=null}
   try{sample=c?await c.use('sample'):null}catch(e){sample=null}
