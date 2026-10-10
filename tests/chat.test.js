@@ -1,0 +1,52 @@
+// Runs the chat logic from index.html against awkward sentences and data.
+// Usage: node tests/chat.test.js   (no dependencies)
+const fs=require('fs'),path=require('path');
+const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];
+const els={};const mk=()=>({hidden:false,checked:false,value:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){}},append(){},focus(){},setAttribute(){},abort(){},querySelectorAll(){return[]},closest(){return mk()},set innerHTML(v){}});
+global.document={getElementById:id=>els[id]||(els[id]=mk()),createElement:()=>mk(),querySelectorAll:()=>[],head:mk()};
+global.window={};global.localStorage={getItem(){return null},setItem(){}};global.location={protocol:'file:'};
+const log=[];
+const patched=src.replace("function say(text,chips,spoken){","function say(text,chips,spoken){log.push(text);return;").replace("function me(text){","function me(text){return;");
+const shop=()=>[
+ {id:'milk',name:'Milk',names:['dudh','दूध','doodh'],unit:'L',qty:20,cost:48,sell:56,low:5},
+ {id:'sugar',name:'Sugar',names:['cheeni','चीनी','sakhar'],unit:'kg',qty:12,cost:39,sell:44,low:5},
+ {id:'pg',name:'Parle-G',names:['parle g','biscuit'],unit:'packet',qty:40,cost:8.5,sell:10,low:5}];
+const cases=[
+ ['price, Hinglish',[],['dudh kitne ka hai'],/₹56 per litre/],
+ ['price, Devanagari',[],['दूध कितने का है'],/₹56 per litre/],
+ ['part unit',[],['aadha kilo cheeni kitne ka'],/500 gram Sugar ₹22/],
+ ['unit mismatch asks',[],['2 kilo milk kitne ka'],/litre/],
+ ['"add" is not "aadha"',[],['milk add karo','10 litre','haan','haan'],/30 litre/,{milk:30}],
+ ['one-line restock',[],['add 10 litre milk','yes','yes'],/30 litre/,{milk:30}],
+ ['new product by steps',[],['besan add karo','5 kg','60','80','nahi','haan'],/jud gaya/],
+ ['set stock',[],['sugar ka stock 25 kilo hai','haan'],/theek/,{sugar:25}],
+ ['sell lowers stock',[],['2 litre dudh becha','haan'],/Sale save/,{milk:18}],
+ ['oversell warns',[],['50 litre dudh becha'],/sirf 20 litre/],
+ ['oversell can be refused',[],['50 litre dudh becha','nahi'],/kuch save nahi/,{milk:20}],
+ ['huge price change warns',[],['dudh ka rate 560 kar do'],/bahut bada/],
+ ['undo a sale',[],['2 litre dudh becha','haan','galat ho gaya'],/wapas/,{milk:20}],
+ ['undo a restock',[],['add 10 litre milk','yes','yes','undo'],/Undid|wapas/,{milk:20}],
+ ['undo with nothing',[],['undo'],/kuch nahi|nothing/],
+ ['unknown sentence',[],['aaj mausam kaisa hai'],/Samajh nahi/],
+ ['unknown product',[],['paneer kitne ka hai'],/Samajh nahi/],
+ ['empty shop',['empty'],['dudh kitne ka hai'],/Samajh nahi/],
+ ['ask tab quotes, no bill',[],['1 litre milk aur 2 kilo sugar ka kitna hua?'],/total ₹144/,{bill:0}],
+ ['sell tab builds bill',['sales'],['2 kilo cheeni, 1 litre dudh','aur 1 kilo sugar'],/Total ₹188/,{bill:2}],
+ ['sell tab confirm',['sales'],['2 kilo cheeni','haan'],/Bill pakka/,{sugar:10}],
+ ['sell tab oversell stops',['sales'],['30 kilo cheeni','bill pakka karo'],/sirf 12 kg/,{sugar:12}],
+ ['duplicate names: pick',['dup'],['milk kitna bacha hai','#pick:m2'],/3 litre/],
+ ['duplicate names: merge',['dup'],['milk kitna bacha hai','#merge'],/23 litre/],
+ ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
+];
+eval(patched+`
+(async()=>{let fail=0;
+for(const [name,flags,says,want,end] of cases){
+  S.products=flags.includes('empty')?[]:shop();if(flags.includes('dup'))S.products.push({id:'m2',name:'milk',names:[],unit:'L',qty:3,cost:null,sell:56,low:0});
+  S.sales=[];S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang='hi';mode=flags.includes('sales')?'sales':'talk';log.length=0;
+  for(const m of says)await handle(m);
+  const all=log.join(' | '),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
+  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:q(k)===end[k]);
+  if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length}):'')}
+}
+console.log(fail?fail+' failed':'all '+cases.length+' passed');process.exit(fail?1:0)})()`);
