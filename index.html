@@ -948,7 +948,10 @@ $('composer').onsubmit=e=>{e.preventDefault();viaMic=false;const v=$('say').valu
 $('voiceAdd').onclick=()=>{showTab('talk');S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};viaMic=true;advanceAdd();if(!$('speakOn').checked)$('mic').click()};
 
 renderAll();
-function greet(){say(tm('नमस्कार! काहीही विचारा किंवा सांगा.','Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell me anything about the shop.'));const c=S.lang==='mr'?[['दूध कितीला आहे?','दूध कितीला आहे'],['विक्री कशी वाढवायची?','vikri kaise badhayein salah'],['1 लिटर दूध आणि 2 किलो साखर','1 litre dudh ani 2 kilo sakhar'],['साखर किती शिल्लक आहे?','साखर किती शिल्लक आहे'],['आजचा हिशोब','aaj ka hisaab'],['काय मागवायचे?','kya mangwana hai']]:S.lang==='en'?
+function greet(){const th=$('thread'),old=th.querySelector?th.querySelector('.msg.greet'):null,txt=tm('नमस्कार! काहीही विचारा किंवा सांगा.','Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell me anything about the shop.');
+  /* Switching language rewrites the greeting in place instead of adding another one. */
+  if(old&&old===th.lastElementChild)old.textContent=txt;else if(!(th.children||[]).length){say(txt);if(th.lastElementChild)th.lastElementChild.classList.add('greet')}
+  const c=S.lang==='mr'?[['दूध कितीला आहे?','दूध कितीला आहे'],['विक्री कशी वाढवायची?','vikri kaise badhayein salah'],['1 लिटर दूध आणि 2 किलो साखर','1 litre dudh ani 2 kilo sakhar'],['साखर किती शिल्लक आहे?','साखर किती शिल्लक आहे'],['आजचा हिशोब','aaj ka hisaab'],['काय मागवायचे?','kya mangwana hai']]:S.lang==='en'?
   [['Price of milk?','price of milk'],['How can I grow sales?','give me advice to improve sales'],['1 litre milk and 2 kg sugar','1 litre milk and 2 kg sugar total'],['How much sugar is left?','how much sugar is left'],['Add ragi','add ragi']]:
   [['Dudh kitne ka hai?','dudh kitne ka hai?'],['Hafte ka hisaab','is hafte ka hisaab'],['Kuch gadbad hai?','kuch gadbad hai kya'],['Bikri kaise badhayein?','bikri kaise badhayein?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']];
   const el=$('tips');el.innerHTML='';c.forEach(([l,sd])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=l;b.onclick=()=>handle(sd);el.append(b)})}
