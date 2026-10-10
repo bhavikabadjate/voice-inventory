@@ -459,8 +459,8 @@ function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p
 function advanceAdd(){const a=S.pending;
   if(!a.p&&!a.name){a.step='name';return say(t('Kaunsa product?','Which product?'))}
   if(a.qty==null){a.step='qty';return say(a.p?t(`${a.p.name} already hai, ${fm(a.p.sell)} per ${UL[a.p.unit]}. Kitna aaya?`,`${a.p.name} exists at ${fm(a.p.sell)} per ${UL[a.p.unit]}. How much came in?`):t('Kitna aaya? (jaise 20 litre)','How much? (e.g. 20 litre)'))}
-  if(!a.p&&a.cost==null&&canCost()){a.step='cost';return say(t('Kharid ka rate kya hai?','Cost price?'))}
-  if(a.sell==null){if(a.p){a.step='sellkeep';return say(t(`Selling price ${fm(a.p.sell)} hi rahega?`,`Keep the selling price at ${fm(a.p.sell)}?`),YN())}a.step='sell';return say(t('Bechne ka rate?','Selling price?'))}
+  if(!a.p&&a.cost==null&&canCost()){a.step='cost';return say(t(`Kharid ka rate kya hai? (1 ${UL[baseOf(a.unit)]} ka)`,`Cost price for 1 ${UL[baseOf(a.unit)]}?`))}
+  if(a.sell==null){if(a.p){a.step='sellkeep';return say(t(`Selling price ${fm(a.p.sell)} hi rahega?`,`Keep the selling price at ${fm(a.p.sell)}?`),YN())}a.step='sell';return say(t(`Bechne ka rate? (1 ${UL[baseOf(a.unit)]} ka)`,`Selling price for 1 ${UL[baseOf(a.unit)]}?`))}
   if(a.exp===undefined){a.step='exp';return say(t('Expiry date batani hai? (jaise 14 Oct, ya nahi)','Expiry date? (e.g. 14 Oct, or no)'),[[t('Nahi','No'),'nahi']])}
   a.step='confirm';const nm=a.p?a.p.name:a.name,u=a.p?a.p.unit:baseOf(a.unit),q=a.p?toBase(a.qty,a.unit,a.p):toBase(a.qty,a.unit,{unit:u});
   if(q==null){a.qty=null;return advanceAdd()}a.q=q;a.u=u;
