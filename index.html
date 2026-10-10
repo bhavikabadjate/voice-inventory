@@ -274,18 +274,19 @@ const NUM={};[['ek one',1],['do don two',2],['teen tin three',3],['char four',4]
 const UNIT={};[['litre liter litr ltr l litres lit लीटर लिटर','l'],['ml','ml'],['kg kilo kilogram kilos किलो','kg'],['gram grams gm g ग्राम','g'],
  ['piece pieces pcs pc nag','pc'],['packet packets pkt pudi पैकेट पाकीट','packet'],['dozen darjan दर्जन','dozen']]
  .forEach(([w,u])=>w.split(' ').forEach(x=>UNIT[key2(x)]=u));
-const W={SELL:K('becha bech bechi beche bechdiya sold sell vikla vikli vikle vikale विकले विकली विकला'),STOCK:K('bacha bachi bache stock shillak left remaining urla urli स्टॉक शिल्लक'),
+const W={SELL:K('becha bech bechi beche becho bechdiya sold sell vikla vikli vikle vikale विकले विकली विकला'),STOCK:K('bacha bachi bache stock shillak left remaining urla urli स्टॉक शिल्लक'),
  ADD:K('add aaya aayi aaye jodo jod joda naya new ala aala aale aali navin'),COST:K('liya kharid kharida kharidi cost ghetla'),SELLP:K('bechna bechenge selling mrp vikaycha'),
- RATE:K('rate price bhav daam kimat'),KAR:K('kar karo kara set kardo badal change'),BILL:K('bill'),PAKKA:K('pakka confirm final done'),
+ RATE:K('rate price bhav daam kimat'),KAR:K('kar karo kara set kardo badal badlo badla change'),BILL:K('bill'),PAKKA:K('pakka confirm final done'),
  REMOVE:K('hata hatao hatado remove kadha kadh'),EXPIRE:K('expire expiry expired'),UNDO:K('undo galat galti wapas vapas ulta mistake'),ALIAS:K('bolte kehte mhantat called'),
  KITNA:K('kitna kitne kitni kiti kitila how किती कितीला'),YES:K('haan ha yes ho hoy hoya ok okay theek thik save sahi y kara'),NO:K('nahi nako no cancel mat n nahin'),
  SEP:K('aur and ani plus'),HI:K('kitna kitne kitni kiti ka ki hai karo becha bacha bachi aur hata haan nahi ahe ko mein'),
  KHATA:K('khata khate khaate khatyat udhari udhaar udhar udhari baki baaki jama credit खाता उधार बाकी जमा'),JAMA:K('jama diye dile chukaya paid received mila mile lautaya जमा'),
- HISAB:K('hisaab hisab hishob kamai summary हिसाब हिशोब'),AAJ:K('aaj aj today आज'),BIKA:K('bika biki bikri sale sales kamaya बिका बिक्री'),REORDER:K('mangwana mangana mangvana mangao magvayche reorder order khatam मंगवाना मागवायचे'),
+ HISAB:K('hisaab hisab hishob kamai summary हिसाब हिशोब'),AAJ:K('aaj aj today आज'),BIKA:K('bika biki bik bikri sale sales kamaya बिका बिक्री'),REORDER:K('mangwana mangana mangvana mangao magvayche reorder order khatam मंगवाना मागवायचे'),
  ADVICE:K('salah salaah advice sujhav suggest suggestion tips badhaye badhayein badhaun badhana badhau improve grow सलाह सुझाव'),PROFIT:K('profit munafa kamai bikri business dhandha मुनाफा'),KAISE:K('kaise kese how कैसे'),
  MSG:K('message msg sandesh reminder offer status मैसेज संदेश'),HAFTA:K('hafte hafta week weekly saptah athavda athavdyacha हफ्ते आठवडा'),GADBAD:K('gadbad garbar gadbadi gadbadiya odd unusual audit jaanch chori गड़बड़ गडबड'),
  AVAIL:K('hai hain ahe aahe available milega milta milti rakhte have है आहे'),
- KSTOP:K('likho likh likhna daalo dalo isko iska yeh ye ne kiye kiya sabse zyada jyada kiska kiski dikhao batao par pe account bill ji wale wala ab tak se liye yancha yanchi yanchya khatyat liha taka cha chi che madhe ahe'),
+ RUPEE:K('rupaye rupay rupaya rupees rupee rs रुपये रुपए'),LESS:K('kam ghatao ghata minus less kami कम'),
+ KSTOP:K('likho likh likhna daalo dalo isko iska yeh ye ne kiye kiya sabse zyada jyada kiska kiski dikhao batao par pe account bill ji wale wala ab tak se liye sab sabka sabhi sare sara all yancha yanchi yanchya khatyat liha taka cha chi che madhe ahe'),
  STOP:K('ka ki ke hai hain mein me ko se liya aur and ani rs rupaye rupees rupay please the of much is what bhi item product kya total hua huwa per ek a for to in at de dena chahiye ahe che la update my mera of')};
 function lev(a,b){if(Math.abs(a.length-b.length)>1)return 2;const d=[...Array(b.length+1).keys()];
   for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
@@ -295,8 +296,11 @@ function tokenize(text){
     .replace(/(\d)([^\d\s.])/g,'$1 $2').replace(/([^\d\s.])(\d)/g,'$1 $2').replace(/\.(\s|$)/g,' ');
   const raw=s.split(/\s+/).filter(Boolean);
   const toks=raw.map(r=>{const k=key(r),k2=key2(r);return{raw:r,k,k2,num:/^\d+(\.\d+)?$/.test(r)?parseFloat(r):(r==='at'?undefined:NUM[k2])}});
+  {const MULT={[key2('sau')]:100,[key2('hundred')]:100,[key2('shambhar')]:100,[key2('hazaar')]:1000,[key2('hajar')]:1000,[key2('thousand')]:1000};
+    for(let i=0;i<toks.length-1;i++){const a=toks[i],b=toks[i+1],m=MULT[b.k2];if(a.num===undefined||!m||MULT[a.k2])continue;a.num*=m;a.raw+=' '+b.raw;toks.splice(i+1,1);
+      const c=toks[i+1];if(c&&c.num!==undefined&&c.num<m&&c.num>=1&&!/^\d/.test(c.raw)&&!MULT[c.k2]){a.num+=c.num;toks.splice(i+1,1)}i--}}
   toks.forEach((t,i)=>{const p=toks[i-1];
-    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||inS(W.KSTOP,p)||p.k2==='de'||p.k2==='dal'))t.num=undefined;
+    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||inS(W.KSTOP,p)||inS(W.SELL,p)||p.k2==='de'||p.k2==='dal'))t.num=undefined;
     t.unit=t.num===undefined?UNIT[t.k2]:undefined;t.sep=t.raw===','||inS(W.SEP,t)});
   return toks}
 
@@ -307,11 +311,12 @@ function nameIndex(){const m=new Map();for(const p of S.products)for(const n of 
 function nameWords(){const out=[];for(const p of S.products)for(const n of [p.name,...(p.names||[])]){const w=String(n).split(/[\s\-]+/).filter(Boolean).map(x=>({k:key(x),k2:key2(x)})).filter(x=>x.k2);if(w.length>1)out.push({id:p.id,w})}return out}
 function parseItems(toks,adding){const idx=nameIndex(),words=nameWords(),items=[],used=new Set();
   const partial=sl=>{const ids=new Set();for(const e of words)for(let a=0;a+sl.length<=e.w.length;a++)if(sl.every((x,j)=>x.k===e.w[a+j].k&&(x.k.length>=3||x.k2===e.w[a+j].k2))){ids.add(e.id);break}return ids};let amb=null,cur={p:null,qty:null,unit:null};
-  const flush=()=>{if(cur.p)items.push(cur);else if(cur.qty!=null&&items.length&&items[items.length-1].qty==null){const l=items[items.length-1];l.qty=cur.qty;l.unit=cur.unit}
+  const flush=()=>{if(cur.p)items.push(cur);else if(cur.amt!=null&&cur.qty==null&&items.length&&items[items.length-1].qty==null&&items[items.length-1].amt==null)items[items.length-1].amt=cur.amt;else if(cur.qty!=null&&items.length&&items[items.length-1].qty==null){const l=items[items.length-1];l.qty=cur.qty;l.unit=cur.unit}
     else if(cur.qty!=null)items.loose=cur;cur={p:null,qty:null,unit:null}};
   for(let i=0;i<toks.length;i++){const t=toks[i];
     if(t.sep){flush();continue}
-    if(t.num!==undefined){if(cur.p&&cur.qty!=null)flush();if(cur.qty==null)cur.qty=t.num;used.add(i);continue}
+    if(t.num!==undefined){const nx=toks[i+1],money=nx&&!nx.unit&&nx.num===undefined&&(inS(W.RUPEE,nx)||['ka','ki','ke'].includes(nx.k2));
+      if(cur.p&&(cur.qty!=null||cur.amt!=null))flush();if(money){if(cur.amt==null)cur.amt=t.num}else if(cur.qty==null)cur.qty=t.num;used.add(i);continue}
     if(t.unit){if(!cur.unit)cur.unit=t.unit;used.add(i);continue}
     let hit=null,n=0;
     for(n=3;n>=1&&!hit;n--){if(i+n>toks.length)continue;const sl=toks.slice(i,i+n),k=sl.map(x=>x.k).join(''),k2=sl.map(x=>x.k2).join('');
@@ -506,7 +511,7 @@ function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=num
   const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&!['dal','do','de','dena','dijiye','karo'].includes(x.k2)&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
   if(!nm){const l=S.customers.map(c=>[c,balance(c.id)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
     return say(l.length?tm('सर्वात जास्त बाकी:\n','Sabse zyada baki:\n','Most owed:\n')+l.slice(0,5).map(([c,b])=>`${c.name} ${fm(b)}`).join('\n')+`\n${tm('एकूण','Kul','Total')} ${fm(l.reduce((a,x)=>a+x[1],0))}`:tm('कोणाचीही बाकी नाही.','Kisi ka kuch baki nahi hai.','Nobody owes anything.'))}
-  const c=findCustomer(nm),name=c?c.name:nm.replace(/(^|\s)\S/g,m=>m.toUpperCase()),pay=has(W.JAMA),useBill=num===undefined&&!has(W.KITNA)&&toks.some(x=>['isko','bill','yeh','ye','iska'].includes(x.k2));
+  const c=findCustomer(nm),name=c?c.name:nm.replace(/(^|\s)\S/g,m=>m.toUpperCase()),pay=has(W.JAMA),useBill=num===undefined&&!has(W.KITNA)&&(toks.some(x=>['isko','bill','yeh','ye','iska'].includes(x.k2))||(toks.some(x=>['dalo','dal','likho','likh','taka','liha'].includes(x.k2))&&(S.bill.length>0||(S.lastSale&&Date.now()-S.lastSale.at<600000))));
   if(num===undefined&&!useBill){if(!c)return say(tm(`${name} नावाचे खाते नाही.`,`${name} naam ka koi khata nahi hai.`,`There is no khata for ${name}.`));const b=balance(c.id);
     return say(b>0?tm(`${c.name} यांची ${fm(b)} बाकी आहे.`,`${c.name} ka ${fm(b)} baki hai.`,`${c.name} owes ${fm(b)}.`):b<0?t(`${c.name} ke ${fm(-b)} zyada jama hain.`,`${c.name} is ${fm(-b)} in advance.`):tm(`${c.name} यांची काही बाकी नाही.`,`${c.name} ka kuch baki nahi.`,`${c.name} owes nothing.`),
       b>0?[[t('WhatsApp reminder','WhatsApp reminder'),remindLink(c,b)]]:null)}
@@ -525,13 +530,15 @@ function khataForm(sign){const n=$('k-name').value.trim(),a=parseFloat($('k-amt'
   const ph=cleanPhone($('k-phone').value);if(ph===null){$('k-msg').textContent=t('Mobile number 10 ank ka hona chahiye','Enter a 10-digit mobile number');return}
   let c=findCustomer(n);if(!c)c=addCustomer(n,ph);else if(ph&&ph!==c.phone){c.phone=ph;saveCustomer(c)}
   addKhata(c,sign*a,'');S.kOpen=c.id;$('k-name').value='';$('k-amt').value='';$('k-phone').value='';$('k-msg').textContent=`${c.name}: ${fm(Math.max(balance(c.id),0))} ${t('baki','owed')}`;renderKhata()}
-function hisaab(){const ss=todaySales(),tot=ss.reduce((a,s)=>a+s.total,0),bills=ss.filter(s=>s.total>0).length-ss.filter(s=>s.total<0).length,agg={};let profit=0,known=true;
+function hisaab(per){const D=864e5,yd=new Date(Date.now()-D).toDateString(),lab=per==='y'?['काल','Kal','Yesterday']:per==='m'?['गेल्या 30 दिवसांत','Pichhle 30 din mein','Last 30 days']:null;
+  const relabel=x=>lab?x.replace(/^आज अजून|^आज/,lab[0]).replace(/^Aaj abhi tak|^Aaj/,lab[1]).replace(/^No sales yet today/,'No sales: '+lab[2]).replace(/^Today/,lab[2]):x;
+  const ss=per==='y'?S.sales.filter(x=>new Date(x.at).toDateString()===yd):per==='m'?S.sales.filter(x=>x.at>Date.now()-30*D):todaySales(),tot=ss.reduce((a,s)=>a+s.total,0),bills=ss.filter(s=>s.total>0).length-ss.filter(s=>s.total<0).length,agg={};let profit=0,known=true;
   ss.forEach(s=>s.items.forEach(i=>{const g=agg[i.name]=agg[i.name]||{amt:0};g.amt+=i.amount;const p=S.products.find(x=>x.name===i.name);if(p&&p.cost!=null)profit+=(i.rate-p.cost)*i.qty;else known=false}));
   const top=Object.entries(agg).filter(x=>x[1].amt>0).sort((a,b)=>b[1].amt-a[1].amt).slice(0,3).map(([n,g])=>`${n} ${fm(g.amt)}`).join(', ');
   const owed=S.customers.reduce((a,c)=>a+Math.max(balance(c.id),0),0);
-  if(!ss.length)return say(tm('आज अजून विक्री झाली नाही.','Aaj abhi tak koi bikri nahi hui.','No sales yet today.')+(owed?tm(` एकूण उधारी बाकी ${fm(owed)}.`,` Kul udhaar baki ${fm(owed)}.`,` Total credit owed ${fm(owed)}.`):''));
-  const sp=tm(`आज ${fm(tot)} ची विक्री, ${bills} बिले.`,`Aaj ${fm(tot)} bika, ${bills} bill.`,`Today: ${fm(tot)} in ${bills} bills.`)+(top?tm(` सर्वात जास्त: ${top}.`,` Sabse zyada: ${top}.`,` Top items: ${top}.`):'')+(owed?tm(` एकूण उधारी बाकी ${fm(owed)}.`,` Kul udhaar baki ${fm(owed)}.`,` Total credit owed ${fm(owed)}.`):'');
-  say(sp+(canCost()&&$('costOn').checked?'\n'+t(`Munafa${known?'':' (jin cheezon ka kharid rate pata hai)'}: ${fm(profit)}`,`Profit${known?'':' (items with a known cost)'}: ${fm(profit)}`):''),null,sp)}
+  if(!ss.length)return say(relabel(tm('आज अजून विक्री झाली नाही.','Aaj abhi tak koi bikri nahi hui.','No sales yet today.'))+(owed?tm(` एकूण उधारी बाकी ${fm(owed)}.`,` Kul udhaar baki ${fm(owed)}.`,` Total credit owed ${fm(owed)}.`):''));
+  const sp=relabel(tm(`आज ${fm(tot)} ची विक्री, ${bills} बिले.`,`Aaj ${fm(tot)} bika, ${bills} bill.`,`Today: ${fm(tot)} in ${bills} bills.`))+(top?tm(` सर्वात जास्त: ${top}.`,` Sabse zyada: ${top}.`,` Top items: ${top}.`):'')+(owed?tm(` एकूण उधारी बाकी ${fm(owed)}.`,` Kul udhaar baki ${fm(owed)}.`,` Total credit owed ${fm(owed)}.`):'');
+  say(sp+(canCost()&&!$('costOn').checked&&per==='p'?'\n'+t('Munafa dekhne ke liye upar Cost chalu karo.','Turn on Cost at the top to see profit.'):'')+(canCost()&&$('costOn').checked?'\n'+t(`Munafa${known?'':' (jin cheezon ka kharid rate pata hai)'}: ${fm(profit)}`,`Profit${known?'':' (items with a known cost)'}: ${fm(profit)}`):''),null,sp)}
 /* How much to order: enough for a week at the recent selling speed, rounded to a sensible pack size. */
 function reorderPlan(){const now=Date.now(),D=864e5,first=S.sales.length?Math.min(...S.sales.map(x=>x.at)):now,days=Math.max(1,Math.min(14,Math.ceil((now-first)/D))),sold={};
   S.sales.filter(x=>x.at>now-14*D).forEach(x=>x.items.forEach(i=>sold[i.name]=(sold[i.name]||0)+i.qty));
@@ -722,7 +729,8 @@ async function advise(question){const f=shopFacts();let ans='',viaAI=false;
 async function offerNames(p){if(!p)return;const list=await suggestNames(p.name,p.names);if(!list.length||!S.products.some(x=>x.id===p.id))return;S.nameOffer={pid:p.id,list};
   say(t(`${p.name} ko log aur kis naam se bolte hain? Jo sahi ho woh chuno.`,`What else do people call ${p.name}? Pick the ones that are right.`),[...list.map((n,i)=>[n,'#nm:'+i]),[t('Sab jodo','Add all'),'#nm:all',1]])}
 /* Words that mark small talk, so it is not mistaken for a question about a product. */
-const CHAT=new Set('kaisa kaisi kaise kese kyun kyu kab kahan kaun why when where who weather mausam time samay hello hi namaste thanks thank dhanyavad shukriya bye tum aap naam'.split(' ').map(key2));
+const CHAT=new Set('kaisa kaisi kaise kese kyun kyu kab kahan kaun why when where who weather mausam time samay hello hi namaste thanks thank dhanyavad shukriya bye tum aap naam what can you help madad raha rahi rahe hua hui gaya gayi tha thi please batao dikhao karna chahiye'.split(' ').map(key2));
+const HELLO=new Set('hello hi namaste namaskar hey'.split(' ').map(key2)),THANKS=new Set('thanks thank dhanyavad shukriya ok okay theek thik accha acha bye'.split(' ').map(key2)),HELPW=new Set('help madad sahayata'.split(' ').map(key2));
 /* ---------- conversation ---------- */
 const t=(hi,en)=>S.lang==='en'?en:hi;
 /* Marathi where a translation exists; otherwise the Hindi line is used. */
@@ -752,7 +760,9 @@ function speak(text){const st=$('speakNote');
 function me(text){const d=document.createElement('div');d.className='msg me';d.textContent=text;$('thread').append(d)}
 const YN=()=>[[tm('हो','Haan','Yes'),'haan',1],[tm('नाही','Nahi','No'),'nahi']];
 function confirmAsk(text,run){S.pending={type:'confirm',run};say(text,YN())}
-function linesOf(items){const out=[];for(const it of items){const q=toBase(it.qty,it.unit,it.p);
+function linesOf(items){const out=[];for(const it of items){
+    if(it.amt!=null&&it.qty==null&&it.p.sell>0){out.push({id:it.p.id,name:it.p.name,qty:r3(it.amt/it.p.sell),unit:it.p.unit,rate:it.p.sell,amount:it.amt,byAmount:true});continue}
+    const q=toBase(it.qty,it.unit,it.p);
   if(q==null){say(tm(`${it.p.name} ${UL[it.p.unit]} मध्ये विकले जाते. किती ${UL[it.p.unit]}?`,`${it.p.name} ${UL[it.p.unit]} mein bikta hai. Kitna ${UL[it.p.unit]}?`,`${it.p.name} is sold by the ${UL[it.p.unit]}. How many ${UL[it.p.unit]}?`));return null}
   out.push({id:it.p.id,name:it.p.name,qty:q,unit:it.p.unit,rate:it.p.sell,amount:Math.round(q*it.p.sell*100)/100})}return out}
 
@@ -783,7 +793,11 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
   if(has(W.HAFTA)&&(has(W.HISAB)||has(W.BIKA)||has(W.SELL)||toks.some(x=>['report','summary','saransh'].includes(x.k2))))return weekly();
   if(has(W.ADVICE)||(has(W.PROFIT)&&has(W.KAISE)))return advise(text);
   if(has(W.KHATA))return khataSay(toks,has);
-  if(has(W.HISAB)||(has(W.AAJ)&&(has(W.SELL)||has(W.BIKA))))return hisaab();
+  {const k=w=>toks.some(x=>w.includes(x.k2)),per=k(['kal','kaal','yesterday'])?'y':k(['mahine','mahina','month','mahinyacha','mahinyat'])?'m':undefined;
+    if(k(['sabse','sarvat','top','best'])&&(has(W.BIKA)||has(W.SELL))&&!has(W.KHATA))return weekly();
+    if(has(W.BIKA)&&has(W.NO))return advise(text);
+    if(has(W.HISAB)||((has(W.AAJ)||per)&&(has(W.SELL)||has(W.BIKA))))return hisaab(per);
+    if(has(W.PROFIT)&&!has(W.KAISE))return hisaab(per||'p')}
   if(has(W.REORDER))return reorder();
   const R=parseItems(toks,has(W.ADD)||has(W.COST)),items=R.items;if(!R.amb)S.prefers=null;
   if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id)).filter(Boolean),same=ps.every(p=>key(p.name)===key(ps[0].name));S.ambText=text;S.ambIds=ps.map(p=>p.id);
@@ -792,12 +806,21 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
   const left=toks.filter((x,i)=>!R.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','ALIAS','KAR','RATE','STOCK','SELL','KITNA'].some(n=>inS(W[n],x)));
   if(has(W.ALIAS)&&items.length===1&&left.length){const nm=left.map(x=>x.raw).join(' '),p=items[0].p;
     return confirmAsk(tm(`"${nm}" हे ${p.name} चे नाव म्हणून सेव्ह करू का?`,`"${nm}" ko ${p.name} ka naam save karun?`,`Save "${nm}" as a name for ${p.name}?`),()=>{saveProduct({...p,names:[...(p.names||[]),nm]});say(tm('नाव जोडले.','Naam jud gaya.','Name added.'))})}
-  if(mode==='sales'&&!items.length&&S.bill.length&&(has(W.YES)||has(W.PAKKA)))return confirmBill();
+  if(mode==='sales'&&!items.length){const k=w=>toks.some(x=>w.includes(x.k2));
+    if(S.bill.length&&(k(['clear','khali'])||(has(W.REMOVE)&&k(['sab','sara','sare','pura','all','bill'])))){S.bill=[];S.forceAsk=0;renderBill();return say(t('Bill khali kar diya.','Bill cleared.'))}
+    if(S.bill.length&&(has(W.YES)||has(W.PAKKA)))return confirmBill(S.forceAsk&&Date.now()-S.forceAsk<120000?true:undefined);
+    if((has(W.BILL)||k(['total']))&&!has(W.PAKKA))return say(S.bill.length?S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`:tm('बिल रिकामे आहे.','Bill khali hai.','The bill is empty.'))}
+  if(mode==='sales'&&items.length&&has(W.LESS)&&S.bill.length){const ls=linesOf(items);if(!ls)return;const done=[];
+    for(const l of ls){const e=S.bill.find(x=>x.id===l.id);if(!e)continue;e.qty=r3(e.qty-l.qty);e.amount=Math.round(e.qty*e.rate*100)/100;done.push(l.name)}
+    S.bill=S.bill.filter(x=>x.qty>0);renderBill();return say(done.length?t(`${done.join(', ')} kam kiya. Total ${fm(billTotal())}`,`Reduced ${done.join(', ')}. Total ${fm(billTotal())}`):t('Yeh cheez bill mein nahi hai.','That item is not on the bill.'))}
   if(mode==='sales'&&items.length&&!['ADD','COST','STOCK','ALIAS','REMOVE','KITNA'].some(n=>has(W[n]))&&!(has(W.RATE)&&has(W.KAR))){
-    const lines=linesOf(items);if(!lines)return;addToBill(lines);return say(lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')+tm(' जोडले. ',' jud gaya. ',' added. ')+`Total ${fm(billTotal())}`)}
+    const raw=linesOf(items);if(!raw)return;const lines=[];for(const l of raw){const e=lines.find(x=>x.id===l.id);if(e){e.qty=r3(e.qty+l.qty);e.amount=Math.round((e.amount+l.amount)*100)/100}else lines.push({...l})}
+    addToBill(lines);return say(lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')+tm(' जोडले. ',' jud gaya. ',' added. ')+`Total ${fm(billTotal())}`)}
   if(has(W.ADD)||has(W.COST))return startAdd(toks,R,left);
   if(has(W.REMOVE)&&items.length){S.bill=S.bill.filter(l=>!items.some(i=>i.p.id===l.id));renderBill();return say(t(items[0].p.name+' bill se hata diya.','Removed '+items[0].p.name+' from the bill.'))}
-  if(has(W.RATE)&&has(W.KAR)&&items.length===1&&items[0].qty!=null){const p=items[0].p,v=items[0].qty;
+  if(has(W.RATE)&&!items.length&&!toks.some(x=>x.num!==undefined))return say(t('Kis cheez ka rate? Aise bolo: "cheeni ka rate 46 kar do".','Price of what? Say: "change sugar price to 46".'));
+  if(items.length===1&&(items[0].qty!=null||items[0].amt!=null)&&!items[0].unit&&!has(W.STOCK)&&!has(W.SELL)&&!has(W.KITNA)&&mode!=='sales'&&(has(W.RATE)||has(W.KAR))){const p=items[0].p,v=items[0].qty??items[0].amt;
+    if(!(v>0))return say(t('Rate zero ya usse kam nahi ho sakta.','A price cannot be zero or less.'));
     const odd=p.sell>0&&(v>p.sell*3||v<p.sell/3)?t('Yeh bahut bada badlav hai. ','That is a very big change. '):'';
     return confirmAsk(odd+tm(`${p.name} चा दर ${fm(p.sell)} वरून ${fm(v)} करू का?`,`${p.name} ka rate ${fm(p.sell)} se ${fm(v)} karun?`,`Change ${p.name} from ${fm(p.sell)} to ${fm(v)}?`),()=>{saveProduct({...p,sell:v,history:[...(p.history||[]),{from:p.sell,to:v,at:Date.now()}]});say(tm(`${p.name} आता ${fm(v)} प्रति ${UL[p.unit]}.`,`${p.name} ab ${fm(v)} per ${UL[p.unit]}.`,`${p.name} is now ${fm(v)} per ${UL[p.unit]}.`))})}
   if(has(W.SELL)&&items.length){const lines=linesOf(items);if(!lines)return;const tot=Math.round(lines.reduce((a,l)=>a+l.amount,0));
@@ -806,8 +829,18 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
   if(has(W.STOCK)&&items.length){const it=items[0],p=it.p;
     if(it.qty!=null&&!has(W.KITNA)){const q=toBase(it.qty,it.unit,p);if(q!=null)return confirmAsk(tm(`${p.name} चा स्टॉक ${fq(q,p.unit)} करू का?`,`${p.name} ka stock ${fq(q,p.unit)} set karun?`,`Set ${p.name} stock to ${fq(q,p.unit)}?`),()=>{saveProduct({...p,qty:q});say(tm('स्टॉक दुरुस्त केला.','Stock theek kar diya.','Stock corrected.'))})}
     return say(items.map(i=>`${i.p.name}: ${fq(i.p.qty,i.p.unit)} ${tm('शिल्लक आहे','bacha hai','left')}`).join('\n'))}
+  if(!items.length&&has(W.STOCK)&&(toks.length<=2||toks.some(x=>['sab','sabka','sara','sare','pura','poora','all','full','sagla'].includes(x.k2)))){const ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
+    return say(ps.length?ps.slice(0,40).map(p=>`${p.name}: ${fq(p.qty,p.unit)}`).join('\n')+(ps.length>40?t(`\n… aur ${ps.length-40}. Poori list Stock tab mein hai.`,`\n… and ${ps.length-40} more. The full list is in the Stock tab.`):''):t('Stock khali hai.','There is no stock yet.'),null,t(`${ps.length} cheezein hain, list screen par hai.`,`${ps.length} items, the list is on the screen.`))}
+  if(!items.length&&has(W.REMOVE))return say(t('Kya hatana hai? Aise bolo: "sugar hata do".','Remove what? Say: "remove sugar".'));
   if(!items.length&&has(W.STOCK))return say(t('Kis cheez ka stock? Aise bolo: "sugar ka stock 25 kilo hai" ya "10 litre milk aaya".','Stock of what? Say "set sugar stock to 25 kg" or "add 10 litre milk".'));
   if(!items.length){
+    {const words=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k2.length>=3&&!Object.values(W).some(w=>inS(w,x))&&!CHAT.has(x.k2)),c=words.length&&words.length<=3?findCustomer(words.map(x=>x.raw).join(' ')):null;
+      /* A customer's name with no product: this is about their khata. */
+      if(c)return khataSay(toks,has);
+      const only=w=>toks.length&&toks.length<=4&&toks.some(x=>w.has(x.k2));
+      if(toks.some(x=>HELPW.has(x.k2))||(toks.some(x=>x.k2==='kya')&&toks.some(x=>['sakte','sakta','sakti'].includes(x.k2)))||/what can you/i.test(text))return say(t('Main yeh kar sakta hoon:\n• Rate: "dudh kitne ka hai", "2 kilo cheeni kitne ki"\n• Stock: "cheeni kitni bachi", "10 kilo cheeni aayi", "sab ka stock"\n• Bikri: "2 litre dudh becha", ya Sell tab mein bill\n• Khata: "Ramesh ke khate mein 200 likho", "Ramesh ka kitna baki"\n• Hisaab: "aaj ka hisaab", "is hafte ka hisaab", "kya mangwana hai"\n• Salah: "bikri kaise badhayein", "kuch gadbad hai kya"\n• Galti: "galat ho gaya" se pichhla kaam wapas','I can help with:\n• Prices: "price of milk", "2 kg sugar"\n• Stock: "how much sugar is left", "add 10 kg sugar", "all stock"\n• Sales: "sold 2 litre milk", or build a bill in the Sell tab\n• Khata: "add 200 to Ramesh khata", "how much does Ramesh owe"\n• Summaries: "today summary", "weekly summary", "reorder list"\n• Advice: "how can I grow sales", "anything odd"\n• Mistakes: "undo" reverses the last change'));
+      if(only(HELLO))return say(tm('नमस्कार! काहीही विचारा किंवा सांगा.','Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell me anything about the shop.'));
+      if(only(THANKS)||(toks.length<=2&&(has(W.YES)||has(W.NO)||toks.some(x=>x.k2==='cancel'))))return say(tm('ठीक आहे.','Theek hai.','Okay.'))}
     if(!fromAI&&S.products.length){const line=await aiRewrite(text);if(line){const l=S.lang;await handle(line.replace(/^price\s+/i,''),true);S.lang=l;
         const R3=parseItems(tokenize(line)),unk=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k.length>=3&&!Object.values(W).some(w=>inS(w,x)));
         if(!S.pending&&R3.items.length===1&&unk.length>=1&&unk.length<=2){const p=R3.items[0].p,nm=unk.map(x=>x.raw).join(' ');S.aliasOffer={pid:p.id,nm};
@@ -817,15 +850,17 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
       /* A question about something the shop does not stock: say so, and offer to add it. */
       if(unk.length&&unk.length<=2&&S.products.length&&!toks.some(x=>CHAT.has(x.k2)))return say(tm(`"${nm}" तुमच्या स्टॉकमध्ये नाही.`,`"${nm}" aapke stock mein nahi hai.`,`"${nm}" is not in your stock.`),[[t(`${nm} add karo`,`Add ${nm}`),`${nm} add karo`]])}
     return say(tm('समजले नाही. असे बोला: "2 लिटर दूध कितीला आहे?", "साखर add करा", "1 किलो साखर विकली".','Samajh nahi aaya. Aise bolo: "2 litre dudh kitne ka hai?", "cheeni add karo", "1 kilo sugar becha".','I did not catch that. Try: "price of 2 litre milk", "add sugar", "sold 1 kg sugar".'))}
+  items.forEach(x=>{if(x.qty===0){x.qty=null;x.unit=null}});
   const lines=linesOf(items);if(!lines)return;
   if(lines.length===1){const l=lines[0],one=items[0].qty==null&&!items[0].unit;S.quote=lines;
     /* "Zhadu hai?" asks whether it is in stock, so answer that as well as the price. */
-    if(one&&has(W.AVAIL)&&!has(W.KITNA)&&!has(W.RATE)){const p=items[0].p;return say(p.qty>0?tm(`हो, ${p.name} आहे: ${fq(p.qty,p.unit)} शिल्लक, ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`Haan, ${p.name} hai: ${fq(p.qty,p.unit)} bacha, ${fm(p.sell)} per ${UL[p.unit]}.`,`Yes, ${p.name} is in stock: ${fq(p.qty,p.unit)} left, ${fm(p.sell)} per ${UL[p.unit]}.`)
+    if(one&&has(W.AVAIL)&&!has(W.RATE)&&(!has(W.KITNA)||!toks.some(x=>['ka','ki','ke','ko','kitila','mol'].includes(x.k2)))){const p=items[0].p;return say(p.qty>0?tm(`हो, ${p.name} आहे: ${fq(p.qty,p.unit)} शिल्लक, ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`Haan, ${p.name} hai: ${fq(p.qty,p.unit)} bacha, ${fm(p.sell)} per ${UL[p.unit]}.`,`Yes, ${p.name} is in stock: ${fq(p.qty,p.unit)} left, ${fm(p.sell)} per ${UL[p.unit]}.`)
       :tm(`${p.name} संपले आहे. दर ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`${p.name} khatam ho gaya hai. Rate ${fm(p.sell)} per ${UL[p.unit]}.`,`${p.name} is out of stock. Price ${fm(p.sell)} per ${UL[p.unit]}.`))}
+    if(l.byAmount)return say(t(`${fm(l.amount)} mein ${fq(l.qty,l.unit)} ${l.name} (${fm(l.rate)} per ${UL[l.unit]})`,`${fm(l.amount)} buys ${fq(l.qty,l.unit)} of ${l.name} (${fm(l.rate)} per ${UL[l.unit]})`));
     return say(one?`${l.name} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${l.name} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
   S.quote=lines;
   say(lines.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[tm('याचे बिल बनवा','Iska bill banao','Make this a bill'),'#bill',1]])}
-function addToBill(lines){$('payBox').innerHTML='';for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
+function addToBill(lines){S.forceAsk=0;$('payBox').innerHTML='';for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
 
 function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p:null,name:it?null:left.map(x=>x.raw).join(' ')||null,qty:null,unit:null,cost:null,sell:null,exp:it&&!tracksExp(it.p)?null:undefined};
   const nr=(i,set,d)=>[d,2*d].some(o=>toks[i+o]&&inS(set,toks[i+o]));
@@ -858,8 +893,9 @@ function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==
   if(a.type==='confirm'){if(yes){S.pending=null;a.run();return true}if(no){S.pending=null;say(tm('ठीक आहे, काही सेव्ह केले नाही.','Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}S.pending=null;return false}
   /* If the reply is not an answer to the question asked but is clearly a new request, drop the half-finished add and do the new thing. */
   {const nm0=a.p?a.p.name:(a.name||t('product','the product')),ok={name:true,qty:num!==undefined,cost:num!==undefined,sell:num!==undefined,unit:!!toks.find(x=>x.unit)||yes,sellkeep:num!==undefined||yes||no,exp:no||!!parseDate(text),confirm:yes||no}[a.step];
-    const fresh=['ADVICE','HISAB','REORDER','KHATA','MSG','GADBAD','SELL','STOCK','KITNA','EXPIRE','UNDO','BILL','HAFTA','RATE'].some(n=>has(W[n]))||(has(W.PROFIT)&&has(W.KAISE))||(a.step!=='name'&&(has(W.ADD)||has(W.AVAIL)));
-    if(fresh&&(a.step==='name'||!ok)){S.pending=null;say(t(`${nm0} add karna beech mein chhod diya.`,`Stopped adding ${nm0}.`));return false}
+    const fresh=['ADVICE','HISAB','REORDER','KHATA','MSG','GADBAD','SELL','STOCK','KITNA','EXPIRE','UNDO','BILL','HAFTA','RATE'].some(n=>has(W[n]))||(has(W.PROFIT)&&has(W.KAISE))||(a.step!=='name'&&(has(W.ADD)||has(W.AVAIL)||parseItems(toks,true).items.some(i=>!a.p||i.p.id!==a.p.id)));
+    const other=a.step!=='name'&&a.step!=='confirm'&&parseItems(toks,true).items.some(i=>!a.p||i.p.id!==a.p.id);
+    if((fresh&&(a.step==='name'||!ok))||other){S.pending=null;say(t(`${nm0} add karna beech mein chhod diya.`,`Stopped adding ${nm0}.`));return false}
     if(!ok){a.bad=(a.bad||0)+1;if(a.bad>=2){say(t(`Yeh jawab samajh nahi aaya. ${nm0} add karna chhodna ho to "cancel" bolo.`,`I did not understand that answer. Say "cancel" to stop adding ${nm0}.`),[[t('Chhodo','Cancel'),'cancel']]);return true}}else a.bad=0}
   switch(a.step){
     case'name':{const R2=parseItems(toks,true),it=R2.items[0],nm=toks.filter((x,i)=>!R2.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','KAR'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ');
@@ -882,7 +918,8 @@ function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==
 const billTotal=()=>Math.round(S.bill.reduce((a,l)=>a+l.amount,0));
 const short=lines=>lines.filter(l=>{const p=S.products.find(x=>x.id===l.id);return p&&l.qty>p.qty}).map(l=>{const p=S.products.find(x=>x.id===l.id);return tm(`${p.name} फक्त ${fq(p.qty,p.unit)} शिल्लक आहे`,`${p.name} sirf ${fq(p.qty,p.unit)} bacha hai`,`only ${fq(p.qty,p.unit)} of ${p.name} left`)}).join(', ');
 function confirmBill(force){if(!S.bill.length)return say(tm('बिल रिकामे आहे.','Bill khali hai.','The bill is empty.'));
-  const sh=short(S.bill);if(sh&&force!==true)return say(tm(`थांबा: ${sh}. तरीही विकायचे?`,`Ruko: ${sh}. Phir bhi bechna hai?`,`Wait: ${sh}. Sell anyway?`),[[tm('हो, विका','Haan, becho','Yes, sell'),'#forcebill',1],[tm('नाही','Nahi','No'),'nahi']]);
+  const sh=short(S.bill);if(sh&&force!==true){S.forceAsk=Date.now();return say(tm(`थांबा: ${sh}. तरीही विकायचे?`,`Ruko: ${sh}. Phir bhi bechna hai?`,`Wait: ${sh}. Sell anyway?`),[[tm('हो, विका','Haan, becho','Yes, sell'),'#forcebill',1],[tm('नाही','Nahi','No'),'nahi']])}
+  S.forceAsk=0;
   const tot=recordSale(S.bill);S.bill=[];renderBill();say(tm(`बिल पक्के, एकूण ${fm(tot)}. स्टॉक कमी केला.`,`Bill pakka, total ${fm(tot)}. Stock kam kar diya.`,`Bill confirmed, total ${fm(tot)}. Stock lowered.`));showPay(tot);return tot}
 const daysTo=d=>Math.ceil((new Date(d)-Date.now())/864e5);
 function expiryList(){const l=[];S.products.forEach(p=>bOf(p).forEach(b=>{if(b.exp&&b.qty>0&&daysTo(b.exp)<=7)l.push([p,b])}));l.sort((x,y)=>bCmp(x[1],y[1]));
