@@ -37,16 +37,20 @@ const cases=[
  ['sell tab oversell stops',['sales'],['30 kilo cheeni','bill pakka karo'],/sirf 12 kg/,{sugar:12}],
  ['duplicate names: pick',['dup'],['milk kitna bacha hai','#pick:m2'],/3 litre/],
  ['duplicate names: merge',['dup'],['milk kitna bacha hai','#merge'],/23 litre/],
+ ['voice add: new product, name step',['voiceadd'],['besan','5 kg','60','80','nahi','haan'],/jud gaya/,{moves:1}],
+ ['voice add: existing product named',['voiceadd'],['dudh 10 litre','haan','haan'],/30 litre/,{milk:30,moves:1}],
+ ['stock log records restock and sale',[],['add 10 litre milk','yes','yes','2 litre dudh becha','haan'],/Sale save/,{milk:28,moves:2}],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`
 (async()=>{let fail=0;
 for(const [name,flags,says,want,end] of cases){
   S.products=flags.includes('empty')?[]:shop();if(flags.includes('dup'))S.products.push({id:'m2',name:'milk',names:[],unit:'L',qty:3,cost:null,sell:56,low:0});
-  S.sales=[];S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang='hi';mode=flags.includes('sales')?'sales':'talk';log.length=0;
+  S.sales=[];S.moves=[];S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang='hi';mode=flags.includes('sales')?'sales':'talk';log.length=0;
+  if(flags.includes('voiceadd')){S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};advanceAdd()}
   for(const m of says)await handle(m);
   const all=log.join(' | '),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
-  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:q(k)===end[k]);
-  if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length}):'')}
+  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:q(k)===end[k]);
+  if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length}):'')}
 }
 console.log(fail?fail+' failed':'all '+cases.length+' passed');process.exit(fail?1:0)})()`);
