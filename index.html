@@ -154,24 +154,43 @@ div.item{cursor:pointer}
 .mrow{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
 .imp{display:grid;grid-template-columns:auto 1fr 5.5rem;gap:6px;align-items:center}
 .imp input[type=text],.imp input[type=number]{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-width:0;width:100%}
+/* --- round 2 layout: settings popover, home tiles, bottom tab bar --- */
+header{position:relative;align-items:center;flex-wrap:nowrap;gap:10px}
+.gear{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px 7px 14px;font-weight:600;font-size:.9rem;color:var(--ink)}
+.gear svg{color:var(--accent)}
+.ctl{position:absolute;right:0;top:calc(100% + 8px);z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 12px 32px rgb(0 0 0/.18);display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center;width:min(300px,calc(100vw - 32px))}
+.ctl .setHead{grid-column:1/-1;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ctl .seg{grid-column:1/-1;justify-self:start}
+.ctl .seg button{padding:7px 14px;font-size:.92rem}
+.ctl .tog{font-size:.9rem;padding:6px 14px;justify-self:start}
+.setHint{color:var(--muted);font-size:.8rem}
+.home{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;flex:none}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;color:var(--ink)}
+.tile b{font:700 1.08rem/1.15 var(--display);font-variant-numeric:tabular-nums;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile small{font-size:.68rem;color:var(--muted);line-height:1.15;text-align:center}
+.tile.warn{border-color:var(--warn)}.tile.warn b{color:var(--warn)}
+.tile:active{transform:scale(.97)}
+.app{padding-bottom:0;gap:10px}
+.tabs{order:9;flex:none;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:18px 18px 0 0;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));margin-inline:-6px;box-shadow:0 -4px 18px rgb(0 0 0/.06)}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;font-weight:600;color:var(--muted);border-radius:12px;box-shadow:none}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-selected="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:none}
+@media (max-height:640px){.tile{padding:5px 2px}.tile b{font-size:.95rem}.tile small{font-size:.62rem}.tabs button{padding:3px 2px;font-size:.66rem}.tabs button svg{width:18px;height:18px}#tips{display:none}}
 </style>
 <div class="app">
   <header>
     <div class="brand"><h1>Bolo <span>Dukaan</span></h1><span class="status" id="status">Connecting…</span></div>
-    <div class="ctl">
+    <button type="button" class="gear" id="gear" aria-haspopup="true" aria-expanded="false" aria-controls="settings"><span id="gearLang">हिंदी</span><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button>
+    <div class="ctl" id="settings" hidden>
+      <span class="setHead" id="setLangH">Language</span>
       <span class="seg" role="group" aria-label="Language"><button type="button" id="lang-hi" aria-pressed="true">हिंदी</button><button type="button" id="lang-mr" aria-pressed="false">मराठी</button><button type="button" id="lang-en" aria-pressed="false">English</button></span>
-      <div class="row"><label class="tog"><input type="checkbox" id="speakOn"> Speak</label><label class="tog"><input type="checkbox" id="costOn"> Cost</label></div>
+      <label class="tog"><input type="checkbox" id="speakOn"> Speak</label><small class="setHint" id="speakHint"></small>
+      <label class="tog"><input type="checkbox" id="costOn"> Cost</label><small class="setHint" id="costHint"></small>
     </div>
   </header>
-  <div class="tabs" role="tablist">
-    <button role="tab" data-tab="talk" aria-selected="true">Ask</button>
-    <button role="tab" data-tab="stock" aria-selected="false">Stock</button>
-    <button role="tab" data-tab="sales" aria-selected="false">Sell</button>
-    <button role="tab" data-tab="khata" aria-selected="false">Khata</button>
-    <button role="tab" data-tab="shop" aria-selected="false" id="shopTab">Shop</button>
-  </div>
 
   <section class="pane" id="pane-talk">
+    <div class="home" id="home"></div>
     <div class="thread" id="thread" aria-live="polite"></div>
     <div class="tips" id="tips" aria-label="Try saying"></div>
     <div class="panel" id="panel">
@@ -236,6 +255,13 @@ div.item{cursor:pointer}
     <div class="shop" id="shopBox" hidden></div>
     <p class="hint" id="shopMsg" style="color:var(--warn)"></p>
   </section>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="talk" aria-selected="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg><span>Ask</span></button>
+    <button role="tab" data-tab="stock" aria-selected="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Stock</span></button>
+    <button role="tab" data-tab="sales" aria-selected="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span>Sell</span></button>
+    <button role="tab" data-tab="khata" aria-selected="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M9 8h6M9 12h4"/></svg><span>Khata</span></button>
+    <button role="tab" data-tab="shop" aria-selected="false" id="shopTab"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l1-6h14l1 6M5 10v10h14V10M9 20v-6h6v6"/></svg><span>Shop</span></button>
+  </nav>
 </div>
 
 <script>
@@ -523,7 +549,7 @@ function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=num
     say(tm(`लिहिले. ${cc.name} यांची आता ${fm(Math.max(b,0))} बाकी आहे.`,`Likh diya. ${cc.name} ka ab ${fm(Math.max(b,0))} baki hai.`,`Done. ${cc.name} now owes ${fm(Math.max(b,0))}.`))})}
 const remindText=(c,b)=>tm(`नमस्कार ${c.name}, ${S.shop.name||'दुकाना'}त तुमची ${fm(b)} बाकी आहे. कृपया जमा करा.${S.shop.upi?' UPI: '+S.shop.upi:''} धन्यवाद.`,`Namaste ${c.name} ji, ${S.shop.name||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`,`Hello ${c.name}, you have ${fm(b)} pending at ${S.shop.name||'our shop'}. Please pay when you can.${S.shop.upi?' UPI: '+S.shop.upi:''} Thank you.`);
 const remindLink=(c,b)=>'https://wa.me/'+(c.phone||'')+'?text='+encodeURIComponent(remindText(c,b));
-function renderKhata(){if(!$('khataList'))return;const rows=S.customers.map(c=>[c,balance(c.id)]).sort((a,b)=>b[1]-a[1]),tot=rows.reduce((a,x)=>a+Math.max(x[1],0),0);
+function renderKhata(){if(!$('khataList'))return;if(typeof renderHome==='function'&&$('home'))setTimeout(renderHome,0);const rows=S.customers.map(c=>[c,balance(c.id)]).sort((a,b)=>b[1]-a[1]),tot=rows.reduce((a,x)=>a+Math.max(x[1],0),0);
   $('khataHead').textContent=tm('एकूण बाकी: ','Kul baki: ','Total owed: ')+fm(tot);$('k-names').innerHTML=S.customers.map(c=>`<option value="${esc(c.name)}">`).join('');
   $('khataList').innerHTML=rows.length?rows.map(([c,b])=>`<div class="item" data-c="${esc(c.id)}" tabindex="0" role="button"><b>${esc(c.name)}</b><span class="p ${b>0?'owe':'clear'}">${b>0?fm(b):b<0?t('jama ','advance ')+fm(-b):t('chukta','settled')}</span>${S.kOpen===c.id?`<span class="kdetail">${S.khata.filter(e=>e.cid===c.id).slice(0,8).map(e=>`<div><span>${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</span><span>${e.amount>0?t('udhaar ','credit ')+fm(e.amount):t('jama ','paid ')+fm(-e.amount)}</span></div>`).join('')}<span class="row" style="flex-wrap:nowrap;margin-top:4px"><input class="kph" type="tel" inputmode="numeric" value="${esc((c.phone||'').replace(/^91(?=\d{10}$)/,''))}" placeholder="${tm('मोबाईल नंबर (ऐच्छिक)','Mobile number (zaroori nahi)','Mobile number (optional)')}" aria-label="Mobile number"><button type="button" class="chip" data-ph="${esc(c.id)}">${tm('नंबर सेव्ह करा','Number save karo','Save number')}</button></span>${b>0?`<a class="btn wa" style="margin:4px 0 0;align-self:flex-start" target="_blank" rel="noopener" href="${remindLink(c,b)}">${c.phone?tm('WhatsApp आठवण पाठवा','WhatsApp reminder bhejo','Send WhatsApp reminder'):tm('WhatsApp आठवण (संपर्क निवडा)','WhatsApp reminder (number chuno)','WhatsApp reminder (pick contact)')}</a>`:''}</span>`:''}</div>`).join('')
     :`<p class="empty">${t('Abhi koi khata nahi. Upar naam aur rakam likho, ya bolo: “Ramesh ke khate mein 200 likho”.','No khata yet. Enter a name and amount above, or say “add 200 to Ramesh khata”.')}</p>`}
@@ -939,7 +965,7 @@ function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a
   $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?`<span class="pill">${tm('कमी','Kam','Low')}</span>`:''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?tm('एक्सपायर झाले','Expire ho gaya','Expired'):tm('एक्सपायरी ','Expiry ','Expires ')+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
    <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?tm(' · खरेदी ',' · kharid ',' · cost ')+fm(p.cost):''}</span></button>`).join('')
    :`<p class="empty">${tm('अजून वस्तू नाहीत. "बोलून जोडा" दाबा, किंवा सांगा "साखर add करा".','Abhi koi product nahi hai. "Bolkar add karo" dabao, ya bolo "cheeni add karo".','No products yet. Tap "Add by voice", or tell the assistant "add sugar".')}</p>`}
-function renderSales(){const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
+function renderSales(){if($('home'))setTimeout(()=>renderHome(),0);const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
   $('salesHead').textContent=tm('आजची विक्री: ','Aaj ki bikri: ',"Today's sales: ")+fm(tt);
   $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):`<p class="empty">${tm('आज अजून विक्री नाही.','Aaj abhi koi bikri nahi hui.','No sales yet today.')}</p>`}
 function renderQuick(){const el=$('quick');el.innerHTML='';[...S.products].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='+ '+p.name;
@@ -947,7 +973,11 @@ function renderQuick(){const el=$('quick');el.innerHTML='';[...S.products].sort(
 const WHY={restock:['आले','Aaya','Restock'],sale:['विकले','Bika','Sale'],set:['दुरुस्ती','Sudhar','Correction'],create:['नवीन वस्तू','Naya product','New product']};
 const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(m.name)}</span><span class="p" style="font-weight:400">${tm(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+tm('आता','ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
 function renderMoves(){$('moveList').innerHTML=S.moves.length?S.moves.slice(0,60).map(moveRow).join(''):'<p class="empty">'+t('Abhi koi stock badlav nahi.','No stock changes yet.')+'</p>'}
-function renderAll(){renderStock();renderSales();renderQuick();renderMoves();renderKhata();renderInfo()}
+/* Four numbers a shopkeeper wants first. Tapping one asks the matching question. */
+function renderHome(){const el=$('home');if(!el)return;const sales=todaySales().reduce((a,x)=>a+x.total,0),owed=S.customers.reduce((a,c)=>a+Math.max(balance(c.id),0),0),low=lowItems().length;let exp=0;S.products.forEach(p=>bOf(p).forEach(b=>{if(b.exp&&b.qty>0&&daysTo(b.exp)<=7)exp++}));
+  const tiles=[['sales',fm(sales),tm('आजची विक्री','Aaj ki bikri',"Today's sales"),0],['owed',fm(owed),tm('उधारी बाकी','Udhaar baki','Credit owed'),0],['low',low,tm('कमी स्टॉक','Kam stock','Low stock'),low>0],['exp',exp,tm('लवकर एक्सपायर','Jaldi expire','Expiring soon'),exp>0]];
+  el.innerHTML=tiles.map(([k,v,l,w])=>`<button type="button" class="tile${w?' warn':''}" data-k="${k}"><b>${v}</b><small>${l}</small></button>`).join('')}
+function renderAll(){renderStock();renderSales();renderQuick();renderMoves();renderKhata();renderInfo();renderHome()}
 
 function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p||!canDel();delete $('f-del').dataset.sure;applyLabels();p=p||{};$('f-sugg').innerHTML='';$('f-smsg').textContent='';
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';const lg=S.moves.filter(m=>m.pid===S.editing).slice(0,6);const bl=p.id?bOf(p).filter(b=>b.qty>0):[];$('f-log').innerHTML=(bl.length>1||bl.some(b=>b.exp)?'<b>'+t('Batch','Batches')+'</b>'+bl.map(b=>`<div class="item"><span>${fq(b.qty,p.unit)}</span><span class="p" style="font-weight:400">${b.exp?fmtD(b.exp):t('date nahi','no date')}</span></div>`).join(''):'')+(lg.length?'<b>'+t('Pichhle badlav','Recent changes')+'</b>'+lg.map(moveRow).join(''):'');$('f-name').focus()}
@@ -995,6 +1025,9 @@ $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechReco
     rec.onend=()=>{listening=false;$('mic').classList.remove('on');$('micLabel').textContent=tm('दाबा आणि बोला','Tap karke bolo','Tap and speak');
       const v=(fin||(got?$('say').value:'')).trim();if(v){$('say').value='';viaMic=true;handle(v)}};
     rec.start()}catch(e){micFallback(tm('माइक सुरू झाला नाही.','Mic chalu nahi hua.','The microphone could not start.'))}};
+$('home').onclick=e=>{const b=e.target.closest('.tile');if(!b)return;const k=b.dataset.k;if(k==='owed')return showTab('khata');viaMic=false;handle(k==='sales'?t('aaj ka hisaab','today summary'):k==='low'?t('kya mangwana hai','reorder list'):t('kya expire hone wala hai','expiry'))};
+$('gear').onclick=e=>{e.stopPropagation();const o=$('settings');o.hidden=!o.hidden;$('gear').setAttribute('aria-expanded',!o.hidden)};
+document.addEventListener('click',e=>{const o=$('settings');if(!o.hidden&&!o.contains(e.target)&&!e.target.closest('#gear')){o.hidden=true;$('gear').setAttribute('aria-expanded','false')}});
 $('k-scan').onclick=scanKhata;$('photoAdd').onclick=photoProduct;
 $('k-form').onsubmit=e=>{e.preventDefault();khataForm(1)};$('k-paid').onclick=()=>khataForm(-1);
 $('khataList').onclick=e=>{if(e.target.closest('a,input'))return;const sv=e.target.closest('[data-ph]');
@@ -1014,7 +1047,7 @@ function greet(){const th=$('thread'),old=th.querySelector?th.querySelector('.ms
   [['Dudh kitne ka hai?','dudh kitne ka hai?'],['Hafte ka hisaab','is hafte ka hisaab'],['Kuch gadbad hai?','kuch gadbad hai kya'],['Bikri kaise badhayein?','bikri kaise badhayein?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']];
   const el=$('tips');el.innerHTML='';c.forEach(([l,sd])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=l;b.onclick=()=>handle(sd);el.append(b)})}
 /* Every fixed label on screen, in Marathi, Hindi and English. kind: text, ph (placeholder), lab (text after a checkbox), first (text before a field). */
-const LABELS=[['[data-tab=talk]','text','विचारा','Pucho','Ask'],['[data-tab=stock]','text','स्टॉक','Stock','Stock'],['[data-tab=sales]','text','विक्री','Becho','Sell'],['[data-tab=khata]','text','खाते','Khata','Khata'],['[data-tab=shop]','text','दुकान','Dukaan','Shop'],
+const LABELS=[['[data-tab=talk] span','text','विचारा','Pucho','Ask'],['[data-tab=stock] span','text','स्टॉक','Stock','Stock'],['[data-tab=sales] span','text','विक्री','Becho','Sell'],['[data-tab=khata] span','text','खाते','Khata','Khata'],['[data-tab=shop] span','text','दुकान','Dukaan','Shop'],
  ['#speakOn','lab','आवाज','Awaaz','Speak'],['#costOn','lab','खरेदी दर','Kharid','Cost'],['#composer button','text','पाठवा','Bhejo','Send'],['#photoAdd','text','फोटो','Photo','Photo'],
  ['#pane-stock details.hist summary','text','स्टॉकची नोंद','Stock ka hisaab','Stock log'],['#reorderBtn','text','मागवायची यादी','Mangwane ki list','Reorder list'],
  ['#f-name','first','नाव','Naam','Name'],['#f-names','first','इतर नावे, स्वल्पविरामाने वेगळी','Doosre naam, comma se alag','Other names, comma separated'],['#f-suggest','text','नावे सुचवा','Naam sujhao','Suggest names'],
@@ -1029,6 +1062,8 @@ function showStatus(){const el=$('status'),raw=el.dataset.raw||'';let out=raw;if
 function applyLabels(){if(!document.querySelector)return;const i=S.lang==='mr'?2:S.lang==='en'?4:3;
   for(const L of LABELS){const el=document.querySelector(L[0]);if(!el)continue;const v=L[i];
     if(L[1]==='ph')el.placeholder=v;else if(L[1]==='lab')el.parentNode.lastChild.textContent=' '+v;else if(L[1]==='first')el.parentNode.firstChild.textContent=v;else if(!el.dataset.sure)el.textContent=v}
+  $('gearLang').textContent=S.lang==='mr'?'मराठी':S.lang==='en'?'English':'हिंदी';$('gear').setAttribute('aria-label',tm('सेटिंग्ज','Settings','Settings'));
+  $('setLangH').textContent=tm('भाषा','Bhasha','Language');$('speakHint').textContent=tm('उत्तरे मोठ्याने वाचा','Jawab bolkar sunao','Read replies aloud');$('costHint').textContent=tm('खरेदी दर आणि नफा दाखवा','Kharid rate aur munafa dikhao','Show cost prices and profit');
   document.documentElement.lang=S.lang;showStatus()}
 /* The status line is written in English all over the code; this keeps a copy and shows it in the chosen language. */
 if(typeof MutationObserver!=='undefined')new MutationObserver(()=>{const el=$('status'),now=el.textContent;if(STATUS.some(([re])=>re.test(now))&&now!==el.dataset.raw){el.dataset.raw=now}else if(!el.dataset.raw)el.dataset.raw=now;showStatus()}).observe($('status'),{childList:true,characterData:true,subtree:true});
