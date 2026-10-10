@@ -112,7 +112,7 @@ type Listener = () => void;
 const dataListeners = new Set<Listener>();
 let outboxListener: Listener | null = null;
 
-/** Called when synced data arrives, so screens reload. */
+/** Called when data changes on this phone or arrives with a sync, so every screen reloads. */
 export function subscribeData(listener: Listener): () => void {
   dataListeners.add(listener);
   return () => dataListeners.delete(listener);
@@ -258,7 +258,9 @@ async function recordMove(db: SQLiteDatabase, productId: string, delta: number, 
   await enqueue(db, { kind: 'move', row: move });
 }
 
+/** After a change on this phone: other tabs reload, and the cloud gets it at the next sync. */
 function changed() {
+  emitDataChanged();
   outboxListener?.();
 }
 

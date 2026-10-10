@@ -4,13 +4,12 @@
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AccountSection } from '@/components/account-section';
 import { notify } from '@/components/notify';
-import { Button, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
+import { Button, Card, Field, Icon, ListRow, Screen, ScreenHeader, SectionTitle } from '@/components/ui';
+import { Spacing, Type } from '@/constants/theme';
 import { alertCount, findAlerts } from '@/core/alerts';
 import { emptyShop, type Shop } from '@/core/bill-document';
 import { unitLabel } from '@/core/units';
@@ -46,67 +45,75 @@ export default function ShopScreen() {
     }
   };
 
+  const rows = [
+    ...alerts.expiring.map(({ product, daysLeft }) => ({
+      key: `e-${product.id}`,
+      name: product.names[0],
+      text: daysLeft < 0 ? 'Expired' : daysLeft === 0 ? 'Expires today' : `Expires in ${daysLeft} days`,
+      urgent: daysLeft <= 0,
+    })),
+    ...alerts.lowStock.map((p) => ({
+      key: `l-${p.id}`,
+      name: p.names[0],
+      text: p.stock <= 0 ? 'Out of stock' : `Only ${p.stock} ${unitLabel(p.unit)} left`,
+      urgent: p.stock <= 0,
+    })),
+  ];
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.title, { color: theme.text }]}>Needs attention</Text>
-          {alertCount(alerts) === 0 ? (
-            <Text style={{ color: theme.textSecondary }}>Nothing is expiring or running low.</Text>
-          ) : null}
-          {alerts.expiring.map(({ product, daysLeft }) => (
-            <View key={`e-${product.id}`} style={[styles.item, { backgroundColor: theme.backgroundElement }]}>
-              <Text style={[styles.itemName, { color: theme.text }]}>{product.names[0]}</Text>
-              <Text style={{ color: daysLeft < 0 ? '#D93F3F' : '#C77700', fontWeight: '600' }}>
-                {daysLeft < 0 ? 'Expired' : daysLeft === 0 ? 'Expires today' : `Expires in ${daysLeft} days`}
-              </Text>
-            </View>
-          ))}
-          {alerts.lowStock.map((p) => (
-            <View key={`l-${p.id}`} style={[styles.item, { backgroundColor: theme.backgroundElement }]}>
-              <Text style={[styles.itemName, { color: theme.text }]}>{p.names[0]}</Text>
-              <Text style={{ color: p.stock <= 0 ? '#D93F3F' : '#C77700', fontWeight: '600' }}>
-                {p.stock <= 0 ? 'Out of stock' : `Only ${p.stock} ${unitLabel(p.unit)} left`}
-              </Text>
-            </View>
-          ))}
+    <Screen>
+      <ScreenHeader title="Shop" />
 
-{can.isOwner ? (
-            <>
-          <Text style={[styles.title, { color: theme.text }]}>Shop details for bills</Text>
-          <View style={styles.row}>
-            <Field label="Shop name" value={shop.name} onChangeText={(name) => setShop({ ...shop, name })} placeholder="Sharma Kirana Store" />
-          </View>
-          <View style={styles.row}>
-            <Field label="Phone" value={shop.phone} onChangeText={(phone) => setShop({ ...shop, phone })} keyboardType="phone-pad" placeholder="98765 43210" />
-          </View>
-          <View style={styles.row}>
-            <Field
-              label="UPI ID (for the payment QR on bills)"
-              value={shop.upiId}
-              onChangeText={(upiId) => setShop({ ...shop, upiId })}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="sharma@okaxis"
-            />
-          </View>
-          <Button title="Save" onPress={save} />
-            </>
-          ) : null}
+      <SectionTitle>Needs attention</SectionTitle>
+      {alertCount(alerts) === 0 ? (
+        <Card style={styles.allGood}>
+          <Icon name={{ ios: 'checkmark.seal.fill', md: 'verified' }} size={22} color={theme.accent} />
+          <Text style={[Type.body, { color: theme.textSecondary }]}>Nothing is expiring or running low.</Text>
+        </Card>
+      ) : (
+        <View>
+          {rows.map((r, i) => (
+            <ListRow key={r.key} first={i === 0} last={i === rows.length - 1}>
+              <Text style={[Type.bodyStrong, styles.flex, { color: theme.text }]}>{r.name}</Text>
+              <Text style={[Type.caption, styles.strong, { color: r.urgent ? theme.danger : theme.warning }]}>{r.text}</Text>
+            </ListRow>
+          ))}
+        </View>
+      )}
 
-          <AccountSection />
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+      {can.isOwner ? (
+        <>
+          <SectionTitle>Shop details for bills</SectionTitle>
+          <Card>
+            <View style={styles.row}>
+              <Field label="Shop name" value={shop.name} onChangeText={(name) => setShop({ ...shop, name })} placeholder="Sharma Kirana Store" />
+            </View>
+            <View style={styles.row}>
+              <Field label="Phone" value={shop.phone} onChangeText={(phone) => setShop({ ...shop, phone })} keyboardType="phone-pad" placeholder="98765 43210" />
+            </View>
+            <View style={styles.row}>
+              <Field
+                label="UPI ID (for the payment QR on bills)"
+                value={shop.upiId}
+                onChangeText={(upiId) => setShop({ ...shop, upiId })}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="sharma@okaxis"
+              />
+            </View>
+            <Button title="Save" onPress={save} />
+          </Card>
+        </>
+      ) : null}
+
+      <AccountSection />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
-  content: { padding: Spacing.four, paddingBottom: BottomTabInset + Spacing.four, gap: Spacing.three },
-  title: { fontSize: 20, fontWeight: '700', marginTop: Spacing.two },
+  flex: { flex: 1 },
+  strong: { fontWeight: '700' },
   row: { flexDirection: 'row' },
-  item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.three, borderRadius: 12 },
-  itemName: { fontSize: 16, fontWeight: '600' },
+  allGood: { flexDirection: 'row', alignItems: 'center' },
 });
