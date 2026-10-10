@@ -1,10 +1,12 @@
-// Local parser for price questions and bill quotes, e.g.
-//   "2 ltr milk kitne ka hai"
-//   "150g ragi how much"
-//   "1ltr milk and 2kg sugar ka kitna hua"
-//   "दूध किती आहे"
-// Anything it doesn't recognise (adding stock, selling, changing prices) is
-// returned as `unknown` so the AI conversation can handle it.
+// Local parser for what a shopkeeper says, e.g.
+//   "2 ltr milk kitne ka hai"            price question
+//   "1ltr milk and 2kg sugar ka kitna hua" bill quote
+//   "milk add karo"                      start adding a product
+//   "10 kilo cheeni aayi"                 restock
+//   "2 litre dudh becha"                  sale
+//   "dudh ka rate 58 kar do"              change selling price
+//   "cheeni kitni bachi hai"              stock question
+// Anything it doesn't recognise is returned as `unknown`.
 
 import { parseNumberWord, toAsciiDigits } from './numbers';
 import { Lang, parseUnit, Unit } from './units';
@@ -18,6 +20,14 @@ export interface ItemRequest {
 
 export type Command =
   | { kind: 'price'; lang: Lang; items: ItemRequest[] }
+  | { kind: 'add'; lang: Lang; item: ItemRequest }
+  | { kind: 'restock'; lang: Lang; items: ItemRequest[] }
+  | { kind: 'sell'; lang: Lang; items: ItemRequest[] }
+  | { kind: 'setPrice'; lang: Lang; name: string; rupees: number }
+  | { kind: 'stock'; lang: Lang; name: string }
+  | { kind: 'confirmBill'; lang: Lang }
+  | { kind: 'yes'; lang: Lang }
+  | { kind: 'no'; lang: Lang }
   | { kind: 'unknown'; lang: Lang; text: string };
 
 const SEPARATORS = new Set(['and', 'aur', 'ani', 'aani', 'और', 'आणि', 'plus', ',', 'तथा']);
@@ -39,15 +49,45 @@ const STOPWORDS = new Set([
   'sanga', 'किती', 'आहे', 'झाले', 'झाला', 'चा', 'ची', 'चे', 'ला', 'सांगा', 'एकूण', 'किंमत',
 ]);
 
-// Words that mean the person wants to change something, not ask a price.
-const ACTION_WORDS = new Set([
-  'add', 'karo', 'kar', 'jodo', 'daalo', 'dalo', 'aaya', 'aayi', 'aya', 'ayi', 'becha', 'bechi',
-  'bik', 'bika', 'biki', 'sold', 'sell', 'update', 'change', 'badlo', 'set', 'delete', 'hatao',
-  'करो', 'जोड़ो', 'डालो', 'आया', 'आई', 'बेचा', 'बिका', 'कर', 'करा', 'टाका', 'विकले', 'आले',
+// Words that pick what the person wants to do. They are never part of a name.
+const ADD_WORDS = new Set([
+  'add', 'jodo', 'jod', 'joddo', 'new', 'naya', 'nayi', 'जोड़ो', 'जोडो', 'जोडा', 'नया', 'ऐड', 'ॲड', 'ऍड', 'एड',
+]);
+const RESTOCK_WORDS = new Set([
+  'aaya', 'aayi', 'aaye', 'aya', 'ayi', 'aye', 'mila', 'mili', 'received', 'came', 'arrived', 'restock',
+  'aale', 'aala', 'aali', 'आया', 'आई', 'आए', 'आये', 'मिला', 'आले', 'आला', 'आली',
+]);
+const SELL_WORDS = new Set([
+  'becha', 'bechi', 'beche', 'bik', 'bika', 'biki', 'bike', 'sold', 'sell', 'vikla', 'vikli', 'vikle',
+  'बेचा', 'बेची', 'बेचे', 'बिका', 'बिकी', 'बिके', 'विकला', 'विकली', 'विकले',
+]);
+const RATE_WORDS = new Set(['rate', 'price', 'bhav', 'bhaav', 'daam', 'dam', 'रेट', 'भाव', 'दाम', 'किंमत', 'kimat']);
+const CHANGE_WORDS = new Set([
+  'kar', 'karo', 'karde', 'kardo', 'set', 'change', 'badlo', 'badal', 'update', 'make', 'kara',
+  'कर', 'करो', 'करदो', 'बदलो', 'करा', 'ठेवा',
+]);
+const STOCK_WORDS = new Set([
+  'bacha', 'bachi', 'bache', 'stock', 'left', 'remaining', 'shillak', 'उरला', 'बचा', 'बची', 'बचे',
+  'स्टॉक', 'शिल्लक',
+]);
+const YES_WORDS = new Set([
+  'haan', 'han', 'ha', 'haa', 'yes', 'yeah', 'ok', 'okay', 'theek', 'thik', 'sahi', 'pakka', 'ho', 'hoy',
+  'barobar', 'save', 'confirm', 'हाँ', 'हां', 'हा', 'ठीक', 'सही', 'पक्का', 'हो', 'होय', 'बरोबर',
+]);
+const NO_WORDS = new Set(['nahi', 'nahin', 'nai', 'na', 'no', 'nope', 'nako', 'cancel', 'नहीं', 'नही', 'ना', 'नाही', 'नको']);
+const FILLERS = new Set(['hai', 'ji', 'bhai', 'karo', 'kar', 'do', 'है', 'जी', 'करो', 'please', 'it', 'is']);
+const BILL_WORDS = new Set(['bill', 'बिल']);
+const FINALISE_WORDS = new Set(['pakka', 'confirm', 'save', 'final', 'bana', 'banao', 'पक्का', 'बनाओ', 'बनवा']);
+
+// Fillers that come with actions ("2 litre dudh bik gaya", "rate kar do").
+const ACTION_FILLERS = new Set([
+  'gaya', 'gayi', 'gaye', 'gya', 'liya', 'diya', 'hai', 'hain', 'ho', 'karo', 'kar', 'do', 'de', 'dena',
+  'abhi', 'aaj', 'stock', 'me', 'mein', 'में', 'गया', 'गई', 'गए', 'दिया', 'लिया', 'दो', 'करो', 'कर',
+  'आज', 'अभी', 'झाला', 'झाले', 'करा', 'टाका', 'daalo', 'dalo', 'डालो',
 ]);
 
-const MARATHI_HINTS = ['kiti', 'aahe', 'ahe', 'zhala', 'jhala', 'ani', 'aani', 'किती', 'आहे', 'झाले', 'झाला', 'आणि', 'एकूण', 'सांगा'];
-const HINDI_HINTS = ['kitne', 'kitna', 'kitni', 'hai', 'hua', 'aur', 'kya', 'ka', 'bata', 'batao', 'कितने', 'कितना', 'है', 'हुआ', 'और', 'क्या'];
+const MARATHI_HINTS = ['kiti', 'aahe', 'ahe', 'zhala', 'jhala', 'ani', 'aani', 'kara', 'aale', 'aala', 'vikla', 'vikle', 'shillak', 'nako', 'hoy', 'किती', 'आहे', 'झाले', 'झाला', 'आणि', 'एकूण', 'सांगा'];
+const HINDI_HINTS = ['kitne', 'kitna', 'kitni', 'hai', 'hua', 'aur', 'kya', 'ka', 'bata', 'batao', 'karo', 'kar', 'aaya', 'aayi', 'aya', 'ayi', 'becha', 'bechi', 'bika', 'biki', 'gaya', 'bacha', 'bachi', 'nahi', 'haan', 'pakka', 'कितने', 'कितना', 'है', 'हुआ', 'और', 'क्या'];
 
 export function detectLang(tokens: string[]): Lang {
   if (tokens.some((t) => MARATHI_HINTS.includes(t))) return 'mr';
@@ -89,18 +129,73 @@ function parseItem(tokens: string[]): ItemRequest | null {
   return { name: nameParts.join(' '), qty, unit };
 }
 
-export function parseCommand(text: string): Command {
-  const tokens = tokenize(text);
-  const lang = detectLang(tokens);
-  if (!tokens.length || tokens.some((t) => ACTION_WORDS.has(t))) {
-    return { kind: 'unknown', lang, text };
-  }
+function splitSegments(tokens: string[]): string[][] {
   const segments: string[][] = [[]];
   for (const t of tokens) {
     if (SEPARATORS.has(t)) segments.push([]);
     else segments[segments.length - 1].push(t);
   }
-  const items = segments.map(parseItem).filter((i): i is ItemRequest => i !== null);
+  return segments;
+}
+
+function parseItems(tokens: string[], drop: Set<string>): ItemRequest[] {
+  const kept = tokens.filter((t) => !drop.has(t) && !ACTION_FILLERS.has(t));
+  return splitSegments(kept)
+    .map(parseItem)
+    .filter((i): i is ItemRequest => i !== null);
+}
+
+const has = (tokens: string[], words: Set<string>) => tokens.some((t) => words.has(t));
+
+export function parseCommand(text: string): Command {
+  const tokens = tokenize(text);
+  const lang = detectLang(tokens);
+  if (!tokens.length) return { kind: 'unknown', lang, text };
+
+  // Short answers in a conversation: "haan", "nahi ji".
+  const core = tokens.filter((t) => !FILLERS.has(t));
+  if (core.length && core.length <= 2) {
+    if (core.every((t) => YES_WORDS.has(t))) return { kind: 'yes', lang };
+    if (core.every((t) => NO_WORDS.has(t))) return { kind: 'no', lang };
+  }
+
+  if (has(tokens, BILL_WORDS) && has(tokens, FINALISE_WORDS)) return { kind: 'confirmBill', lang };
+
+  if (has(tokens, STOCK_WORDS) && !has(tokens, RESTOCK_WORDS)) {
+    const item = parseItem(tokens.filter((t) => !STOCK_WORDS.has(t) && !ACTION_FILLERS.has(t)));
+    if (item) return { kind: 'stock', lang, name: item.name };
+  }
+
+  if (has(tokens, RATE_WORDS) && has(tokens, CHANGE_WORDS)) {
+    // "kar do": here "do" means "do it", not two.
+    const numbers = tokens
+      .filter((t) => t !== 'do')
+      .map(parseNumberWord)
+      .filter((n): n is number => n !== null);
+    const name = tokens
+      .filter((t) => parseNumberWord(t) === null && parseUnit(t) === null)
+      .filter((t) => !RATE_WORDS.has(t) && !CHANGE_WORDS.has(t) && !ACTION_FILLERS.has(t))
+      .filter((t) => !STOPWORDS.has(t) && !['rs', 'rupees', 'rupaye', 'रुपये', 'to', 'per', 'prati'].includes(t))
+      .join(' ');
+    if (numbers.length && name) return { kind: 'setPrice', lang, name, rupees: numbers[numbers.length - 1] };
+  }
+
+  if (has(tokens, ADD_WORDS)) {
+    const [item] = parseItems(tokens, ADD_WORDS);
+    if (item) return { kind: 'add', lang, item };
+  }
+  if (has(tokens, SELL_WORDS)) {
+    const items = parseItems(tokens, SELL_WORDS);
+    if (items.length) return { kind: 'sell', lang, items };
+  }
+  if (has(tokens, RESTOCK_WORDS)) {
+    const items = parseItems(tokens, RESTOCK_WORDS);
+    if (items.length) return { kind: 'restock', lang, items };
+  }
+
+  const items = splitSegments(tokens)
+    .map(parseItem)
+    .filter((i): i is ItemRequest => i !== null);
   if (!items.length) return { kind: 'unknown', lang, text };
   return { kind: 'price', lang, items };
 }

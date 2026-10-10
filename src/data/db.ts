@@ -5,6 +5,7 @@ import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { Product } from '@/core/billing';
+import type { Action } from '@/core/conversation';
 import type { Unit } from '@/core/units';
 
 export const DATABASE_NAME = 'dukaan.db';
@@ -21,6 +22,15 @@ export async function migrate(db: SQLiteDatabase) {
       stock REAL NOT NULL DEFAULT 0,
       expiry TEXT,
       updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bill_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      qty REAL NOT NULL,
+      sell_paise INTEGER NOT NULL,
+      amount_paise INTEGER NOT NULL,
+      sold_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS price_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +96,80 @@ export async function saveProduct(db: SQLiteDatabase, p: Product) {
 
 export async function deleteProduct(db: SQLiteDatabase, id: string) {
   await db.runAsync('DELETE FROM products WHERE id = ?', id);
+}
+
+async function recordPrice(db: SQLiteDatabase, productId: string, now: string) {
+  await db.runAsync(
+    `INSERT INTO price_history (product_id, sell_paise, cost_paise, changed_at)
+     SELECT id, sell_paise, cost_paise, ? FROM products WHERE id = ?`,
+    now, productId,
+  );
+}
+
+/** Save what the shopkeeper confirmed in the conversation. */
+export async function applyAction(db: SQLiteDatabase, action: Action) {
+  const now = new Date().toISOString();
+  switch (action.type) {
+    case 'create':
+      await saveProduct(db, { ...action.product, id: newProductId() });
+      return;
+    case 'restock':
+      await db.withTransactionAsync(async () => {
+        for (const item of action.items) {
+          await db.runAsync(
+            'UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?',
+            item.qty, now, item.productId,
+          );
+          if (action.sellPaise !== undefined) {
+            const changed = await db.runAsync(
+              'UPDATE products SET sell_paise = ? WHERE id = ? AND sell_paise != ?',
+              action.sellPaise, item.productId, action.sellPaise,
+            );
+            if (changed.changes) await recordPrice(db, item.productId, now);
+          }
+        }
+      });
+      return;
+    case 'setPrice':
+      await db.withTransactionAsync(async () => {
+        await db.runAsync(
+          'UPDATE products SET sell_paise = ?, updated_at = ? WHERE id = ?',
+          action.sellPaise, now, action.productId,
+        );
+        await recordPrice(db, action.productId, now);
+      });
+      return;
+    case 'sell': {
+      const billId = `b_${Date.now().toString(36)}`;
+      await db.withTransactionAsync(async () => {
+        for (const line of action.lines) {
+          await db.runAsync(
+            `INSERT INTO sales (bill_id, product_id, qty, sell_paise, amount_paise, sold_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            billId, line.productId, line.qty, line.sellPaise, line.amountPaise, now,
+          );
+          // Stock can go below zero if a sale was recorded before restocking;
+          // the shopkeeper sees it and corrects it.
+          await db.runAsync(
+            'UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?',
+            line.qty, now, line.productId,
+          );
+        }
+      });
+      return;
+    }
+  }
+}
+
+/** Total of today's sales, in paise. */
+export async function todaysSalesPaise(db: SQLiteDatabase): Promise<number> {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const row = await db.getFirstAsync<{ total: number | null }>(
+    'SELECT SUM(amount_paise) AS total FROM sales WHERE sold_at >= ?',
+    start.toISOString(),
+  );
+  return row?.total ?? 0;
 }
 
 /** Products from the phone's database, reloaded with `refresh()` after a change. */

@@ -46,15 +46,15 @@ const T = {
   },
 };
 
-function qtyText(qty: number): string {
+export function qtyText(qty: number): string {
   return String(Number(qty.toFixed(3)));
 }
 
-type Resolved =
+export type Resolved =
   | { ok: true; line: BillLine; spokenName: string; asked: ItemRequest }
   | { ok: false; text: string };
 
-function resolve(item: ItemRequest, products: Product[], lang: Lang): Resolved {
+export function resolve(item: ItemRequest, products: Product[], lang: Lang): Resolved {
   const matches = findProducts(item.name, products);
   if (!matches.length) return { ok: false, text: T.notFound[lang](item.name) };
   if (matches.length > 1) {
@@ -75,9 +75,13 @@ function resolve(item: ItemRequest, products: Product[], lang: Lang): Resolved {
   return { ok: true, line: q.line, spokenName, asked: item };
 }
 
+export function unknownAnswer(lang: Lang): Answer {
+  return { kind: 'unknown', lang, text: T.unknown[lang] };
+}
+
 export function answer(command: Command, products: Product[]): Answer {
   const { lang } = command;
-  if (command.kind === 'unknown') return { kind: 'unknown', lang, text: T.unknown[lang] };
+  if (command.kind !== 'price') return unknownAnswer(lang);
 
   const resolved = command.items.map((item) => resolve(item, products, lang));
   const problem = resolved.find((r) => !r.ok);

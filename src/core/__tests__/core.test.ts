@@ -91,9 +91,19 @@ describe('parsing', () => {
   it('detects Marathi', () => {
     expect(parseCommand('दूध किती आहे').lang).toBe('mr');
   });
-  it('leaves changes to the AI conversation', () => {
-    expect(parseCommand('milk add karo').kind).toBe('unknown');
-    expect(parseCommand('2 litre dudh becha').kind).toBe('unknown');
+  it('recognises stock changes and questions', () => {
+    expect(parseCommand('milk add karo')).toMatchObject({ kind: 'add', item: { name: 'milk' } });
+    expect(parseCommand('10 kilo cheeni aayi')).toMatchObject({
+      kind: 'restock', items: [{ name: 'cheeni', qty: 10, unit: 'kg' }],
+    });
+    expect(parseCommand('2 litre dudh bik gaya')).toMatchObject({
+      kind: 'sell', items: [{ name: 'dudh', qty: 2, unit: 'l' }],
+    });
+    expect(parseCommand('dudh ka rate 58 kar do')).toMatchObject({ kind: 'setPrice', name: 'dudh', rupees: 58 });
+    expect(parseCommand('cheeni kitni bachi hai')).toMatchObject({ kind: 'stock', name: 'cheeni' });
+    expect(parseCommand('bill pakka karo').kind).toBe('confirmBill');
+    expect(parseCommand('haan ji').kind).toBe('yes');
+    expect(parseCommand('नाही').kind).toBe('no');
   });
 });
 
