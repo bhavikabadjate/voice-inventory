@@ -3,9 +3,9 @@
 const fs=require('fs'),path=require('path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const src=html.match(/<script>(?!window\.SEED)([\s\S]*?)<\/script>/)[1];
-const els={};const mk=()=>({hidden:false,checked:false,value:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){}},append(){},focus(){},setAttribute(){},abort(){},querySelectorAll(){return[]},closest(){return mk()},set innerHTML(v){}});
+const els={};const mk=()=>({hidden:false,checked:false,value:'',textContent:'',dataset:{},style:{},classList:{add(){},remove(){}},append(){},focus(){},setAttribute(){},abort(){},blur(){},contains(){return false},querySelectorAll(){return[]},closest(){return mk()},set innerHTML(v){}});
 global.document={getElementById:id=>els[id]||(els[id]=mk()),createElement:()=>mk(),querySelectorAll:()=>[],head:mk()};
-global.window={};global.localStorage={getItem(){return null},setItem(){}};global.location={protocol:'file:'};
+global.window={addEventListener(){}};global.localStorage={getItem(){return null},setItem(){}};global.location={protocol:'file:'};
 const log=[];
 const patched=src.replace("function say(text,chips,spoken){","function say(text,chips,spoken){log.push(text);return;").replace("function me(text){","function me(text){return;");
 const shop=()=>[
@@ -40,17 +40,30 @@ const cases=[
  ['voice add: new product, name step',['voiceadd'],['besan','5 kg','60','80','nahi','haan'],/jud gaya/,{moves:1}],
  ['voice add: existing product named',['voiceadd'],['dudh 10 litre','haan','haan'],/30 litre/,{milk:30,moves:1}],
  ['stock log records restock and sale',[],['add 10 litre milk','yes','yes','2 litre dudh becha','haan'],/Sale save/,{milk:28,moves:2}],
+ ['khata: add credit by voice',[],['Ramesh ke khate mein 200 likho','haan'],/Ramesh ka ab ₹200 baki/,{khata:1}],
+ ['khata: "likh do" is not the number 2',[],['Ramesh ke khate mein 200 likh do','haan'],/₹200 baki/,{khata:1}],
+ ['khata: payment lowers balance',[],['Ramesh ke khate mein 200 likho','haan','Ramesh ne 50 jama kiye','haan'],/₹150 baki/,{khata:2}],
+ ['khata: balance question',[],['Ramesh ke khate mein 200 likho','haan','Ramesh ka kitna baki hai'],/Ramesh ka ₹200 baki hai/],
+ ['khata: unknown customer',[],['Suresh ka kitna baki hai'],/koi khata nahi/],
+ ['khata: who owes most',[],['Ramesh ke khate mein 200 likho','haan','Sita ke khate mein 500 likho','haan','sabse zyada udhaar kiska hai'],/Sita ₹500[\s\S]*Ramesh ₹200[\s\S]*₹700/],
+ ['khata: put the bill on credit',['sales'],['2 kilo cheeni','isko Ramesh ke khate mein daalo','haan'],/₹88 baki/,{sugar:10,khata:1,bill:0}],
+ ['khata: undo an entry',[],['Ramesh ke khate mein 200 likho','haan','galat ho gaya','Ramesh ka kitna baki hai'],/kuch baki nahi/],
+ ['hisaab: no sales',[],['aaj ka hisaab'],/koi bikri nahi/],
+ ['hisaab: totals and top item',[],['2 litre dudh becha','haan','1 kilo cheeni becha','haan','aaj kitna bika'],/Aaj ₹156 bika, 2 bill.*Milk ₹112/],
+ ['hisaab: undone sale nets out',[],['2 litre dudh becha','haan','undo','aaj ka hisaab'],/₹0 bika, 0 bill/],
+ ['reorder: nothing low',[],['kya mangwana hai'],/zaroorat nahi/],
+ ['reorder: lists low items',[],['sugar ka stock 3 kilo hai','haan','kya mangwana hai'],/Sugar: 3 kg bacha/],
  ['cancel mid-flow',[],['milk add karo','cancel'],/cancel/,{milk:20}],
 ];
 eval(patched+`
 (async()=>{let fail=0;
 for(const [name,flags,says,want,end] of cases){
   S.products=flags.includes('empty')?[]:shop();if(flags.includes('dup'))S.products.push({id:'m2',name:'milk',names:[],unit:'L',qty:3,cost:null,sell:56,low:0});
-  S.sales=[];S.moves=[];S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang='hi';mode=flags.includes('sales')?'sales':'talk';log.length=0;
+  S.sales=[];S.moves=[];S.customers=[];S.khata=[];S.lastSale=null;S.bill=[];S.pending=null;S.undo=null;S.quote=null;S.lang='hi';mode=flags.includes('sales')?'sales':'talk';log.length=0;
   if(flags.includes('voiceadd')){S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};advanceAdd()}
   for(const m of says)await handle(m);
   const all=log.join(' | '),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
-  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:q(k)===end[k]);
-  if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length}):'')}
+  if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:k==='khata'?S.khata.length===end[k]:q(k)===end[k]);
+  if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length,khata:S.khata.length}):'')}
 }
 console.log(fail?fail+' failed':'all '+cases.length+' passed');process.exit(fail?1:0)})()`);

@@ -137,6 +137,17 @@ html,body{overflow:hidden}
   .mic{width:54px;height:54px;box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 16%,transparent)}.mic svg{width:26px;height:26px}.micLabel{margin:0}
   .tabs button{padding:6px}.msg.bot.latest{font-size:1.15rem}
 }
+.tabs button{font-size:.93rem;padding-inline:2px}
+.pay{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.pay b{font:700 1.4rem/1 var(--display);margin-left:6px}
+.pay{padding:10px 12px;gap:6px}
+.qr{background:#fff;padding:6px;border-radius:10px;width:140px;max-width:100%;margin:0 auto}
+.qr svg{display:block;width:100%;height:auto}
+.pay input{padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);min-width:0;flex:1}
+.pay .row{width:100%;flex-wrap:nowrap}
+.owe{color:var(--warn)}.clear{color:var(--accent)}
+.kdetail{grid-column:1/-1;font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:4px;padding-top:6px}
+.kdetail div{display:flex;justify-content:space-between;gap:8px}
 </style>
 <div class="app">
   <header>
@@ -150,7 +161,8 @@ html,body{overflow:hidden}
     <button role="tab" data-tab="talk" aria-selected="true">Ask</button>
     <button role="tab" data-tab="stock" aria-selected="false">Stock</button>
     <button role="tab" data-tab="sales" aria-selected="false">Sell</button>
-    <button role="tab" data-tab="shop" aria-selected="false" id="shopTab" hidden>Shop</button>
+    <button role="tab" data-tab="khata" aria-selected="false">Khata</button>
+    <button role="tab" data-tab="shop" aria-selected="false" id="shopTab">Shop</button>
   </div>
 
   <section class="pane" id="pane-talk">
@@ -171,7 +183,7 @@ html,body{overflow:hidden}
 
   <section class="pane" id="pane-stock" hidden>
     <div class="row"><button class="btn go" id="voiceAdd"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg> <span id="voiceAddT">Bolkar add karo</span></button><button class="btn" id="newBtn">Add by typing</button></div>
-    <span class="status" id="alerts"></span>
+    <div class="row"><span class="status" id="alerts"></span><button class="chip" type="button" id="reorderBtn" hidden>Reorder list</button></div>
     <details class="hist"><summary>Stock log</summary><div class="list" id="moveList"></div></details>
     <form class="form" id="edit" hidden>
       <label class="w">Name<input id="f-name" required></label>
@@ -194,19 +206,30 @@ html,body{overflow:hidden}
       <div class="bill" id="bill" hidden></div>
       <p class="empty" id="billEmpty">Bill khali hai. Mic dabao aur bolo: “2 kilo cheeni, 1 packet Parle-G”, ya neeche se item chuno.</p>
       <p class="sellSay" id="sellSay" aria-live="polite"></p>
+      <div id="payBox"></div>
     </div>
     <div class="tips" id="quick" aria-label="Tap to add to the bill"></div>
   </section>
 
+  <section class="pane" id="pane-khata" hidden>
+    <form class="card" id="k-form">
+      <div class="row" style="flex-wrap:nowrap"><input id="k-name" placeholder="Customer name" list="k-names" autocomplete="off" style="flex:2;min-width:0"><datalist id="k-names"></datalist><input id="k-amt" type="number" inputmode="decimal" min="0" step="any" placeholder="₹" style="flex:1;min-width:0"></div>
+      <div class="row"><button class="btn go" type="submit">Udhaar diya</button><button class="btn" type="button" id="k-paid">Paisa mila</button><span class="status" id="k-msg"></span></div>
+    </form>
+    <h2 id="khataHead" style="margin:0;font:600 1rem var(--display)"></h2>
+    <div class="list" id="khataList"></div>
+  </section>
+
   <section class="pane" id="pane-shop" hidden>
-    <div class="shop" id="shopBox"></div>
+    <div class="shop" id="shopInfo"></div>
+    <div class="shop" id="shopBox" hidden></div>
     <p class="hint" id="shopMsg" style="color:var(--warn)"></p>
   </section>
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
-const S={moves:[],products:[],sales:[],bill:[],pending:null,lang:'hi',editing:null};
+const S={customers:[],khata:[],shop:{name:'',upi:''},lastSale:null,moves:[],products:[],sales:[],bill:[],pending:null,lang:'hi',editing:null};
 let db=null,sample=null;
 const UL={L:'litre',kg:'kg',pc:'piece',packet:'packet'};
 const fm=x=>'₹'+(Math.round(x*100)/100).toLocaleString('en-IN');
@@ -246,6 +269,9 @@ const W={SELL:K('becha bech bechi beche bechdiya sold sell vikla vikli vikle'),S
  REMOVE:K('hata hatao hatado remove kadha kadh'),EXPIRE:K('expire expiry expired'),UNDO:K('undo galat galti wapas vapas ulta mistake'),ALIAS:K('bolte kehte mhantat called'),
  KITNA:K('kitna kitne kitni kiti how'),YES:K('haan ha yes ho hoy ok okay theek thik save sahi y'),NO:K('nahi nako no cancel mat n nahin'),
  SEP:K('aur and ani plus'),HI:K('kitna kitne kitni kiti ka ki hai karo becha bacha bachi aur hata haan nahi ahe ko mein'),
+ KHATA:K('khata khate khaate udhaar udhar udhari baki baaki jama credit खाता उधार बाकी जमा'),JAMA:K('jama diye chukaya paid received mila mile lautaya जमा'),
+ HISAB:K('hisaab hisab kamai summary हिसाब'),AAJ:K('aaj aj today आज'),BIKA:K('bika biki bikri sale sales kamaya बिका बिक्री'),REORDER:K('mangwana mangana mangvana mangao reorder order khatam मंगवाना'),
+ KSTOP:K('likho likh likhna daalo dalo daal isko iska yeh ye ne kiye kiya sabse zyada jyada kiska kiski dikhao batao par pe account bill ji wale wala ab tak se liye'),
  STOP:K('ka ki ke hai hain mein me ko se liya aur and ani rs rupaye rupees rupay please the of much is what bhi item product kya total hua huwa per ek a for to in at de dena chahiye ahe che la update my mera of')};
 function lev(a,b){if(Math.abs(a.length-b.length)>1)return 2;const d=[...Array(b.length+1).keys()];
   for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
@@ -256,7 +282,7 @@ function tokenize(text){
   const raw=s.split(/\s+/).filter(Boolean);
   const toks=raw.map(r=>{const k=key(r),k2=key2(r);return{raw:r,k,k2,num:/^\d+(\.\d+)?$/.test(r)?parseFloat(r):(r==='at'?undefined:NUM[k2])}});
   toks.forEach((t,i)=>{const p=toks[i-1];
-    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||p.k2==='de'))t.num=undefined;
+    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||inS(W.KSTOP,p)||p.k2==='de'))t.num=undefined;
     t.unit=t.num===undefined?UNIT[t.k2]:undefined;t.sep=t.raw===','||inS(W.SEP,t)});
   return toks}
 
@@ -282,19 +308,22 @@ function toBase(q,u,p){if(q==null)q=1;if(!u)return q;const b=p.unit;
 const baseOf=u=>({l:'L',ml:'L',kg:'kg',g:'kg',pc:'pc',dozen:'pc',packet:'packet'}[u]||'pc');
 
 /* ---------- storage ---------- */
-function persist(){if(db||store)return;try{localStorage.setItem('shop',JSON.stringify({products:S.products,sales:S.sales,moves:S.moves.slice(0,300)}))}catch(e){}}
+function snapshot(){return{products:S.products,sales:S.sales.slice(0,400),moves:S.moves.slice(0,300),customers:S.customers,khata:S.khata.slice(0,2000),shop:S.shop}}
+function restore(d){S.products=d.products||[];S.sales=d.sales||[];S.moves=d.moves||[];S.customers=d.customers||[];S.khata=d.khata||[];S.shop=d.shop||{name:'',upi:''}}
+/* On the hosted site a signed-in shop keeps a copy on the phone, so it opens and works with no internet. */
+function persist(){if(db)return;try{if(store)localStorage.setItem('cloudcache',JSON.stringify({...snapshot(),store,member}));else localStorage.setItem('shop',JSON.stringify(snapshot()))}catch(e){}}
 function saveProduct(p,reason,noUndo){const i=S.products.findIndex(x=>x.id===p.id),old=i<0?null:S.products[i];if(i<0)S.products.push(p);else S.products[i]=p;renderAll();persist();
   {const delta=Math.round((p.qty-(old?old.qty:0))*1000)/1000;if(delta){const m={pid:p.id,name:p.name,unit:p.unit,delta,after:p.qty,reason:old?(reason||'set'):'create',at:Date.now()};S.moves.unshift(m);renderMoves();persist();if(db)db.collection('moves').add(m).catch(()=>{})}}
   if(!noUndo&&reason!=='sale')S.undo={what:p.name,run:()=>old?saveProduct(old,'set',true):deleteProduct(p.id)};
-  if(store)enqueue(()=>cloudSave(p,old,reason||'set'));
+  if(store)cloudSave(p,old,reason||'set');
   if(db){const {id,...d}=p;db.collection('products').doc(id).set(d).catch(e=>say('Save failed: '+(e.message||e.code)+'. Check your connection and try again.'))}}
 function deleteProduct(id){S.products=S.products.filter(p=>p.id!==id);renderAll();persist();if(db)db.collection('products').doc(id).delete().catch(()=>{});
-  if(store)enqueue(async()=>{ck(await sb.from('products').update({deleted:true}).eq('id',id))})}
+  if(store)outbox({t:'del',id})}
 function recordSale(lines,noUndo){lines=lines.map(l=>({...l}));
   if(!noUndo)S.undo={what:t('sale','the sale'),run:()=>recordSale(lines.map(l=>({...l,qty:-l.qty,amount:-l.amount})),true)};
   const total=Math.round(lines.reduce((a,l)=>a+l.amount,0));
   for(const l of lines){const p=S.products.find(x=>x.id===l.id);if(p)saveProduct({...p,qty:Math.max(0,Math.round((p.qty-l.qty)*1000)/1000)},'sale',true)}
-  if(store){const bill=nid('b'),at=new Date().toISOString(),sid=store.id;enqueue(async()=>{ck(await sb.from('sales').insert(lines.map(l=>({id:nid('s'),store_id:sid,bill_id:bill,product_id:l.id,qty:l.qty,sell_paise:Math.round(l.rate*100),amount_paise:Math.round(l.amount*100),sold_at:at}))))})}
+  if(store){const bill=nid('b'),at=new Date().toISOString(),sid=store.id;outbox({t:'sales',rows:lines.map(l=>({id:nid('s'),store_id:sid,bill_id:bill,product_id:l.id,qty:l.qty,sell_paise:Math.round(l.rate*100),amount_paise:Math.round(l.amount*100),sold_at:at}))})}
   const sale={items:lines.map(l=>({name:l.name,qty:l.qty,unit:l.unit,rate:l.rate,amount:l.amount})),total,at:Date.now()};
   if(db)db.collection('sales').add(sale).catch(()=>{});else{S.sales.unshift(sale);renderSales();persist()}
   return total}
@@ -307,38 +336,59 @@ const U2R={L:'l',kg:'kg',pc:'piece',packet:'custom:packet'},R2U={l:'L',kg:'kg',p
 const nid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const ck=r=>{if(r.error)throw r.error;return r.data};
 const canCost=()=>!member||member.role==='owner'||member.can_see_cost;
-function enqueue(fn){queue=queue.then(fn).then(()=>{if(store)$('status').textContent='Synced: '+store.name},e=>{$('status').textContent='Not synced';$('shopMsg').textContent='Could not save to the cloud: '+(e.message||e)+'. Check the internet, then tap Sync now.'});return queue}
-async function cloudSave(p,old,reason){const sid=store.id;
+function enqueue(fn){queue=queue.then(fn).then(()=>{if(store)$('status').textContent='Synced: '+store.name},e=>{$('status').textContent=OB.length?`Offline: ${OB.length} waiting to sync`:'Offline'});return queue}
+/* Outbox: every change is saved on the phone first and sent in order when the internet is there. */
+let OB=[];try{OB=JSON.parse(localStorage.getItem('outbox')||'[]')}catch(e){}
+function saveOB(){try{localStorage.setItem('outbox',JSON.stringify(OB))}catch(e){}}
+function outbox(op){OB.push(op);saveOB();persist();enqueue(flush)}
+const transient=e=>(typeof navigator!=='undefined'&&navigator.onLine===false)||/fetch|network|timeout|load failed/i.test(String(e&&e.message||e));
+async function runOp(o){const once={ignoreDuplicates:true};
+  if(o.t==='product')ck(await sb.from('products').upsert(o.row));
+  else if(o.t==='cost')ck(await sb.from('product_costs').upsert(o.row));
+  else if(o.t==='move')ck(await sb.from('stock_moves').upsert(o.row,once));
+  else if(o.t==='sales')ck(await sb.from('sales').upsert(o.rows,once));
+  else if(o.t==='del')ck(await sb.from('products').update({deleted:true}).eq('id',o.id));
+  else if(o.t==='cust')ck(await sb.from('customers').upsert(o.row));
+  else if(o.t==='khata')ck(await sb.from('khata_entries').upsert(o.row,once));
+  else if(o.t==='store')ck(await sb.from('stores').update(o.row).eq('id',o.id))}
+async function flush(){while(OB.length){try{await runOp(OB[0])}catch(e){if(transient(e))throw e;$('shopMsg').textContent='One change was refused by the cloud and dropped: '+(e.message||e)}OB.shift();saveOB()}}
+async function sync(){await flush();await pull()}
+function cloudSave(p,old,reason){const sid=store.id;
   const unit=(p.runit&&!R2U[p.runit]&&p.unit==='pc')?p.runit:U2R[p.unit];
-  ck(await sb.from('products').upsert({id:p.id,store_id:sid,names:[p.name,...(p.names||[])],unit,sell_paise:Math.round(p.sell*100),expiry:p.expiry||null,low_stock_at:p.low||null,deleted:false}));
-  if(p.cost!=null&&canCost()&&(!old||old.cost!==p.cost))ck(await sb.from('product_costs').upsert({product_id:p.id,store_id:sid,cost_paise:Math.round(p.cost*100)}));
+  outbox({t:'product',row:{id:p.id,store_id:sid,names:[p.name,...(p.names||[])],unit,sell_paise:Math.round(p.sell*100),expiry:p.expiry||null,low_stock_at:p.low||null,deleted:false}});
+  if(p.cost!=null&&canCost()&&(!old||old.cost!==p.cost))outbox({t:'cost',row:{product_id:p.id,store_id:sid,cost_paise:Math.round(p.cost*100)}});
   const delta=Math.round((p.qty-(old?old.qty:0))*1000)/1000;
-  if(delta)ck(await sb.from('stock_moves').insert({id:nid('m'),store_id:sid,product_id:p.id,delta,reason:old?reason:'create',created_at:new Date().toISOString()}))}
+  if(delta)outbox({t:'move',row:{id:nid('m'),store_id:sid,product_id:p.id,delta,reason:old?reason:'create',created_at:new Date().toISOString()}})}
 async function allRows(table,cols){let out=[],from=0;for(;;){const d=ck(await sb.from(table).select(cols).eq('store_id',store.id).order(table==='product_costs'?'product_id':'id').range(from,from+999));out=out.concat(d);if(d.length<1000)break;from+=1000}return out}
-async function pull(){if(!store)return;
-  const [ps,cs,ms,ss]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta,reason,created_at'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at')]);
+async function pull(){if(!store||OB.length)return;
+  const [ps,cs,ms,ss,cu,kh]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta,reason,created_at'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at'),allRows('customers','id,name,deleted').catch(()=>[]),allRows('khata_entries','id,customer_id,amount_paise,note,created_at').catch(()=>[])]);
+  if(OB.length)return;
+  S.customers=cu.filter(c=>!c.deleted).map(c=>({id:c.id,name:c.name}));S.khata=kh.map(k=>({id:k.id,cid:k.customer_id,amount:k.amount_paise/100,note:k.note||'',at:+new Date(k.created_at)})).sort((a,b)=>b.at-a.at);
   const q={},cost={},byId={};ms.forEach(m=>q[m.product_id]=(q[m.product_id]||0)+m.delta);cs.forEach(c=>cost[c.product_id]=c.cost_paise/100);
   const conv=p=>({id:p.id,name:(p.names&&p.names[0])||'?',names:(p.names||[]).slice(1),unit:R2U[p.unit]||'pc',runit:p.unit,sell:p.sell_paise/100,cost:cost[p.id]??null,qty:Math.round((q[p.id]||0)*1000)/1000,low:p.low_stock_at||0,expiry:p.expiry||''});
   ps.forEach(p=>byId[p.id]=conv(p));
   S.moves=ms.map(m=>({pid:m.product_id,name:(byId[m.product_id]||{name:'?'}).name,unit:(byId[m.product_id]||{unit:'pc'}).unit,delta:m.delta,reason:m.reason,at:+new Date(m.created_at)})).sort((a,b)=>b.at-a.at).slice(0,300);S.products=ps.filter(p=>!p.deleted).map(p=>byId[p.id]);
   const bills=new Map();ss.forEach(r=>{const b=bills.get(r.bill_id)||{items:[],paise:0,at:+new Date(r.sold_at)};const pr=byId[r.product_id]||{name:'?',unit:'pc'};
     b.items.push({name:pr.name,qty:r.qty,unit:pr.unit,rate:r.sell_paise/100,amount:r.amount_paise/100});b.paise+=r.amount_paise;bills.set(r.bill_id,b)});
-  S.sales=[...bills.values()].map(b=>({items:b.items,total:Math.round(b.paise/100),at:b.at})).sort((a,b)=>b.at-a.at);renderAll()}
+  S.sales=[...bills.values()].map(b=>({items:b.items,total:Math.round(b.paise/100),at:b.at})).sort((a,b)=>b.at-a.at);renderAll();persist()}
 async function findStore(){session=(await sb.auth.getSession()).data.session;store=null;member=null;if(!session)return;
-  const ms=ck(await sb.from('members').select('store_id,role,name,can_see_cost,can_delete').eq('user_id',session.user.id).limit(1));if(!ms.length)return;
-  member=ms[0];store=ck(await sb.from('stores').select('id,name,code').eq('id',member.store_id).single());
+  try{const ms=ck(await sb.from('members').select('store_id,role,name,can_see_cost,can_delete').eq('user_id',session.user.id).limit(1));if(!ms.length)return;
+    member=ms[0];store=ck(await sb.from('stores').select('id,name,code,upi_id').eq('id',member.store_id).single());S.shop={name:store.name||'',upi:store.upi_id||''}}
+  catch(e){if(!transient(e))throw e;let c=null;try{c=JSON.parse(localStorage.getItem('cloudcache')||'null')}catch(x){}
+    if(!c||!c.store)throw e;store=c.store;member=c.member;restore(c);renderAll();$('status').textContent='Offline'}
   $('costOn').closest('label').hidden=!canCost();if(!canCost()){$('costOn').checked=false}
-  await enqueue(pull)}
+  renderInfo();await enqueue(sync)}
 function loadScript(src){return new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error('could not load '+src));document.head.append(e)})}
 async function cloudInit(){await loadScript('supabase.js');
   sb=window.supabase.createClient(SB_URL,SB_KEY);await findStore();renderShop();
-  setInterval(()=>{if(store&&document.visibilityState==='visible'&&!S.pending&&$('edit').hidden)enqueue(pull)},20000)}
+  setInterval(()=>{if(store&&document.visibilityState==='visible'&&!S.pending&&$('edit').hidden)enqueue(sync)},20000);
+  window.addEventListener('online',()=>enqueue(sync))}
 function renderShop(){const b=$('shopBox');
   if(!sb){b.innerHTML='<div class="card"><h2>Shop account</h2><p>Connecting to the cloud…</p></div>';return}
   if(store){b.innerHTML=`<div class="card"><h2>${esc(store.name||'Shop')}</h2><p>You are signed in as ${member.role==='owner'?'the owner':'staff'}${member.name?' ('+esc(member.name)+')':''}. Stock and sales sync with every phone of this shop.</p>
     ${member.role==='owner'?`<p>Staff join with this shop code:</p><div class="code">${esc(store.code)}</div>`:''}
     <div class="row"><button class="btn go" id="c-sync">Sync now</button><button class="btn" id="c-out">Sign out</button></div></div>`;
-    $('c-sync').onclick=()=>act(()=>enqueue(pull));$('c-out').onclick=()=>act(async()=>{await sb.auth.signOut();location.reload()});return}
+    $('c-sync').onclick=()=>act(()=>enqueue(sync));$('c-out').onclick=()=>act(async()=>{await sb.auth.signOut();location.reload()});return}
   if(session){b.innerHTML=`<div class="card"><h2>Create your shop</h2><p>You are signed in but have no shop yet. The ${S.products.length} products on this device will be uploaded to it.</p>
     <input id="n-shop" placeholder="Shop name" autocomplete="organization"><input id="n-owner" placeholder="Your name" autocomplete="name">
     <div class="row"><button class="btn go" id="c-create">Create shop</button><button class="btn" id="c-out">Sign out</button></div></div>`+staffCard();
@@ -368,10 +418,74 @@ async function aiRewrite(text){const names=S.products.map(p=>p.name);let line=''
   }catch(e){return null}
   line=line.trim().split('\n')[0];return line&&!/^unknown/i.test(line)?line:null}
 
+/* ---------- shop details, UPI QR, khata, daily summary, reorder ---------- */
+const lowItems=()=>S.products.filter(p=>(p.low>0&&p.qty<=p.low)||p.qty<=0);
+const todaySales=()=>{const d=new Date().toDateString();return S.sales.filter(s=>new Date(s.at).toDateString()===d)};
+function saveShop(sh){S.shop=sh;persist();if(db)db.doc('meta/shop').set(sh).catch(()=>{});if(store&&member.role==='owner'){store.name=sh.name;outbox({t:'store',id:store.id,row:{name:sh.name,upi_id:sh.upi}})}renderInfo()}
+function renderInfo(){const b=$('shopInfo');if(!b||b.contains(document.activeElement))return;const ro=store&&member.role!=='owner';
+  b.innerHTML=`<form class="card" id="i-form"><h2>${t('Dukaan ki jaankari','Shop details')}</h2><p>${t('UPI ID daalne par har bill ke saath QR dikhega. Paisa seedha aapke account mein jaata hai, app ke through nahi.','With a UPI ID, every bill shows a QR for that amount. Money goes straight to your account, not through the app.')}</p>
+    <input id="i-name" placeholder="${t('Dukaan ka naam','Shop name')}" value="${esc(S.shop.name||'')}" ${ro?'disabled':''}><input id="i-upi" placeholder="UPI ID (name@bank)" value="${esc(S.shop.upi||'')}" autocapitalize="off" ${ro?'disabled':''}>
+    ${ro?'':`<div class="row"><button class="btn go" type="submit">Save</button><span class="status" id="i-msg"></span></div>`}</form>`;
+  if(!ro)$('i-form').onsubmit=e=>{e.preventDefault();const upi=$('i-upi').value.trim(),name=$('i-name').value.trim();document.activeElement&&document.activeElement.blur();
+    if(upi&&!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(upi)){renderInfo();$('i-msg').textContent=t('UPI ID aisi hoti hai: name@bank','A UPI ID looks like name@bank');return}
+    saveShop({name,upi});$('i-msg').textContent=t('Save ho gaya','Saved')}}
+let qrReady=null;
+async function showPay(total){S.lastSale={total,at:Date.now()};const b=$('payBox');if(!(total>0)){b.innerHTML='';return}$('billEmpty').hidden=true;
+  b.innerHTML=`<div class="pay"><span>${t('Lena hai','To collect')} <b>${fm(total)}</b></span><div id="qrSlot">${S.shop.upi?'':`<small>${t('QR ke liye Shop tab mein UPI ID daalo.','Add your UPI ID in the Shop tab to show a QR here.')}</small>`}</div>
+    <div class="row"><input id="p-cust" placeholder="${t('Udhaar? Customer ka naam','On credit? Customer name')}" list="k-names" autocomplete="off"><button class="btn" type="button" id="p-khata">${t('Khate mein','To khata')}</button></div>
+    <button class="btn go" type="button" id="p-done" style="align-self:stretch">${t('Paisa mil gaya','Payment received')}</button></div>`;
+  $('p-done').onclick=()=>{b.innerHTML='';$('billEmpty').hidden=!!S.bill.length};
+  $('p-khata').onclick=()=>{const n=$('p-cust').value.trim();if(!n)return $('p-cust').focus();const c=findCustomer(n)||addCustomer(n);addKhata(c,total,'bill');b.innerHTML='';$('billEmpty').hidden=!!S.bill.length;say(t(`${c.name} ke khate mein ${fm(total)} likh diya. Ab ${fm(balance(c.id))} baki hai.`,`Added ${fm(total)} to ${c.name}'s khata. They now owe ${fm(balance(c.id))}.`))};
+  if(!S.shop.upi)return;
+  try{qrReady=qrReady||loadScript(window.claude?'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js':'qrcode.js');await qrReady;
+    const q=window.qrcode(0,'M');q.addData(`upi://pay?pa=${encodeURIComponent(S.shop.upi)}&pn=${encodeURIComponent(S.shop.name||'Shop')}&am=${total.toFixed(2)}&cu=INR&tn=Bill`);q.make();
+    const slot=$('qrSlot');if(slot)slot.innerHTML=`<div class="qr">${q.createSvgTag({cellSize:4,margin:2,scalable:true})}</div><small>${esc(S.shop.upi)}</small>`}
+  catch(e){qrReady=null;const slot=$('qrSlot');if(slot)slot.innerHTML=`<small>${t('QR nahi ban paya. UPI ID:','Could not draw the QR. UPI ID:')} ${esc(S.shop.upi)}</small>`}}
+
+const balance=cid=>Math.round(S.khata.filter(e=>e.cid===cid).reduce((a,e)=>a+e.amount,0)*100)/100;
+function findCustomer(name){const k=key2(name),kk=key(name);return S.customers.find(c=>key2(c.name)===k)||S.customers.find(c=>kk.length>=4&&lev(key(c.name),kk)<=1)||S.customers.find(c=>key2(c.name.split(/\s+/)[0])===k)}
+function addCustomer(name){name=name.replace(/(^|\s)\S/g,m=>m.toUpperCase());const c={id:nid('c'),name};S.customers.push(c);
+  if(db)db.collection('customers').doc(c.id).set({name}).catch(()=>{});if(store)outbox({t:'cust',row:{id:c.id,store_id:store.id,name,phone:'',deleted:false}});return c}
+function addKhata(c,amount,note,noUndo){const e={id:nid('k'),cid:c.id,amount,note:note||'',at:Date.now()};S.khata.unshift(e);persist();
+  if(db)db.collection('khata').doc(e.id).set({cid:e.cid,amount,note:e.note,at:e.at}).catch(()=>{});
+  if(store)outbox({t:'khata',row:{id:e.id,store_id:store.id,customer_id:c.id,amount_paise:Math.round(amount*100),note:e.note,created_at:new Date().toISOString()}});
+  if(!noUndo)S.undo={what:t('khata entry','the khata entry'),run:()=>addKhata(c,-amount,'undo',true)};renderKhata()}
+function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=numTok&&numTok.num;
+  const nm=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&!['STOP','KHATA','JAMA','KITNA','KSTOP','KAR','ADD'].some(n=>inS(W[n],x))).map(x=>x.raw).join(' ').trim();
+  if(!nm){const l=S.customers.map(c=>[c,balance(c.id)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+    return say(l.length?t('Sabse zyada baki:\n','Most owed:\n')+l.slice(0,5).map(([c,b])=>`${c.name} ${fm(b)}`).join('\n')+`\n${t('Kul','Total')} ${fm(l.reduce((a,x)=>a+x[1],0))}`:t('Kisi ka kuch baki nahi hai.','Nobody owes anything.'))}
+  const c=findCustomer(nm),name=c?c.name:nm.replace(/(^|\s)\S/g,m=>m.toUpperCase()),pay=has(W.JAMA),useBill=num===undefined&&!has(W.KITNA)&&toks.some(x=>['isko','bill','yeh','ye','iska'].includes(x.k2));
+  if(num===undefined&&!useBill){if(!c)return say(t(`${name} naam ka koi khata nahi hai.`,`There is no khata for ${name}.`));const b=balance(c.id);
+    return say(b>0?t(`${c.name} ka ${fm(b)} baki hai.`,`${c.name} owes ${fm(b)}.`):b<0?t(`${c.name} ke ${fm(-b)} zyada jama hain.`,`${c.name} is ${fm(-b)} in advance.`):t(`${c.name} ka kuch baki nahi.`,`${c.name} owes nothing.`),
+      b>0?[[t('WhatsApp reminder','WhatsApp reminder'),remindLink(c,b)]]:null)}
+  const amt=useBill?(S.bill.length?billTotal():S.lastSale&&S.lastSale.total):num;
+  if(!(amt>0))return say(t('Koi bill nahi hai jo khate mein daalun.','There is no bill to put on the khata.'));
+  confirmAsk(pay?t(`${name} ne ${fm(amt)} jama kiye, likhun?`,`Record ${fm(amt)} received from ${name}?`):t(`${name} ke khate mein ${fm(amt)} udhaar likhun?`,`Add ${fm(amt)} credit to ${name}'s khata?`),()=>{
+    if(useBill&&S.bill.length){const sh=short(S.bill);if(sh)return say(t(`Pehle bill theek karo: ${sh}.`,`Fix the bill first: ${sh}.`));recordSale(S.bill);S.bill=[];renderBill()}
+    $('payBox').innerHTML='';const cc=c||findCustomer(name)||addCustomer(name);addKhata(cc,pay?-amt:amt,useBill?'bill':'');const b=balance(cc.id);
+    say(t(`Likh diya. ${cc.name} ka ab ${fm(Math.max(b,0))} baki hai.`,`Done. ${cc.name} now owes ${fm(Math.max(b,0))}.`))})}
+const remindLink=(c,b)=>'https://wa.me/?text='+encodeURIComponent(`Namaste ${c.name} ji, ${S.shop.name||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`);
+function renderKhata(){if(!$('khataList'))return;const rows=S.customers.map(c=>[c,balance(c.id)]).sort((a,b)=>b[1]-a[1]),tot=rows.reduce((a,x)=>a+Math.max(x[1],0),0);
+  $('khataHead').textContent=t('Kul baki: ','Total owed: ')+fm(tot);$('k-names').innerHTML=S.customers.map(c=>`<option value="${esc(c.name)}">`).join('');
+  $('khataList').innerHTML=rows.length?rows.map(([c,b])=>`<button class="item" data-c="${esc(c.id)}"><b>${esc(c.name)}</b><span class="p ${b>0?'owe':'clear'}">${b>0?fm(b):b<0?t('jama ','advance ')+fm(-b):t('chukta','settled')}</span>${S.kOpen===c.id?`<span class="kdetail">${S.khata.filter(e=>e.cid===c.id).slice(0,8).map(e=>`<div><span>${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</span><span>${e.amount>0?t('udhaar ','credit ')+fm(e.amount):t('jama ','paid ')+fm(-e.amount)}</span></div>`).join('')}${b>0?`<a class="btn wa" style="margin:4px 0 0;align-self:flex-start" target="_blank" rel="noopener" href="${remindLink(c,b)}">WhatsApp reminder</a>`:''}</span>`:''}</button>`).join('')
+    :`<p class="empty">${t('Abhi koi khata nahi. Upar naam aur rakam likho, ya bolo: “Ramesh ke khate mein 200 likho”.','No khata yet. Enter a name and amount above, or say “add 200 to Ramesh khata”.')}</p>`}
+function khataForm(sign){const n=$('k-name').value.trim(),a=parseFloat($('k-amt').value);if(!n||!(a>0)){$('k-msg').textContent=t('Naam aur rakam dono chahiye','Enter both a name and an amount');return}
+  const c=findCustomer(n)||addCustomer(n);addKhata(c,sign*a,'');S.kOpen=c.id;$('k-name').value='';$('k-amt').value='';$('k-msg').textContent=`${c.name}: ${fm(Math.max(balance(c.id),0))} ${t('baki','owed')}`;renderKhata()}
+function hisaab(){const ss=todaySales(),tot=ss.reduce((a,s)=>a+s.total,0),bills=ss.filter(s=>s.total>0).length-ss.filter(s=>s.total<0).length,agg={};let profit=0,known=true;
+  ss.forEach(s=>s.items.forEach(i=>{const g=agg[i.name]=agg[i.name]||{amt:0};g.amt+=i.amount;const p=S.products.find(x=>x.name===i.name);if(p&&p.cost!=null)profit+=(i.rate-p.cost)*i.qty;else known=false}));
+  const top=Object.entries(agg).filter(x=>x[1].amt>0).sort((a,b)=>b[1].amt-a[1].amt).slice(0,3).map(([n,g])=>`${n} ${fm(g.amt)}`).join(', ');
+  const owed=S.customers.reduce((a,c)=>a+Math.max(balance(c.id),0),0);
+  if(!ss.length)return say(t('Aaj abhi tak koi bikri nahi hui.','No sales yet today.')+(owed?t(` Kul udhaar baki ${fm(owed)}.`,` Total credit owed ${fm(owed)}.`):''));
+  const sp=t(`Aaj ${fm(tot)} bika, ${bills} bill.`,`Today: ${fm(tot)} in ${bills} bills.`)+(top?t(` Sabse zyada: ${top}.`,` Top items: ${top}.`):'')+(owed?t(` Kul udhaar baki ${fm(owed)}.`,` Total credit owed ${fm(owed)}.`):'');
+  say(sp+(canCost()&&$('costOn').checked?'\n'+t(`Munafa${known?'':' (jin cheezon ka kharid rate pata hai)'}: ${fm(profit)}`,`Profit${known?'':' (items with a known cost)'}: ${fm(profit)}`):''),null,sp)}
+function reorder(){const l=lowItems();if(!l.length)return say(t('Abhi kuch mangwane ki zaroorat nahi. Stock tab mein har cheez ka low-stock level set kar sakte ho.','Nothing needs reordering. You can set a low-stock level per product in the Stock tab.'));
+  const lines=l.map(p=>`${p.name}: ${fq(p.qty,p.unit)} ${t('bacha','left')}`);
+  say(t('Yeh mangwana hai:\n','To reorder:\n')+lines.join('\n'),[[t('WhatsApp par bhejo','Send on WhatsApp'),'https://wa.me/?text='+encodeURIComponent(`${S.shop.name?S.shop.name+' - ':''}Order:\n`+l.map(p=>`- ${p.name}`).join('\n')),1]])}
+
 /* ---------- conversation ---------- */
 const t=(hi,en)=>S.lang==='en'?en:hi;
 function say(text,chips,spoken){const d=document.createElement('div');d.className='msg bot';d.textContent=text;
-  if(chips){const c=document.createElement('div');c.className='chips';chips.forEach(([label,send,go])=>{const b=document.createElement('button');b.type='button';b.className=go?'btn go':'chip';b.textContent=label;b.onclick=()=>handle(send);c.append(b)});d.append(c)}
+  if(chips){const c=document.createElement('div');c.className='chips';chips.forEach(([label,send,go])=>{const link=send.startsWith('https://'),b=document.createElement(link?'a':'button');b.className=go?'btn go':'chip';b.textContent=label;if(link){b.href=send;b.target='_blank';b.rel='noopener';b.style.textDecoration='none'}else{b.type='button';b.onclick=()=>handle(send)}c.append(b)});d.append(c)}
   document.querySelectorAll('.msg.latest').forEach(x=>x.classList.remove('latest'));d.classList.add('latest');$('thread').append(d);$('thread').scrollTop=1e9;
   $('sellSay').textContent=mode==='sales'?text:'';
   if($('speakOn').checked)speak(spoken||text);else setTimeout(autoListen,500)}
@@ -407,6 +521,7 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
     else S.prefer=text.slice(6);
     try{await handle(o,true)}finally{S.prefer=null}return}
   if(text==='#forcebill')return confirmBill(true);
+  if(text==='#alias'){const o=S.aliasOffer;S.aliasOffer=null;const p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;saveProduct({...p,names:[...(p.names||[]),o.nm]},'set',true);return say(t(`"${o.nm}" ab ${p.name} ka naam hai.`,`"${o.nm}" is now a name for ${p.name}.`))}
   if(text==='#bill'){if(S.quote){addToBill(S.quote);S.quote=null}return showTab('sales')}
   if(!fromAI)me(text);
   const toks=tokenize(text),has=s=>toks.some(x=>inS(s,x));
@@ -416,6 +531,9 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
     const u=S.undo;S.undo=null;u.run();S.undo=null;return say(t(`${u.what} wapas kar diya.`,`Undid ${u.what}.`))}
   if(has(W.BILL)&&has(W.PAKKA))return confirmBill();
   if(has(W.EXPIRE))return expiryList();
+  if(has(W.KHATA))return khataSay(toks,has);
+  if(has(W.HISAB)||(has(W.AAJ)&&(has(W.SELL)||has(W.BIKA))))return hisaab();
+  if(has(W.REORDER))return reorder();
   const R=parseItems(toks),items=R.items;
   if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id)).filter(Boolean),same=ps.every(p=>key(p.name)===key(ps[0].name));S.ambText=text;S.ambIds=ps.map(p=>p.id);
     const chips=ps.map(p=>[`${p.name} · ${fm(p.sell)} · ${fq(p.qty,p.unit)}`,'#pick:'+p.id]);if(same)chips.push([t('Ek hi cheez hai, mila do','Same item, merge them'),'#merge',1]);
@@ -433,20 +551,24 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
     return confirmAsk(odd+t(`${p.name} ka rate ${fm(p.sell)} se ${fm(v)} karun?`,`Change ${p.name} from ${fm(p.sell)} to ${fm(v)}?`),()=>{saveProduct({...p,sell:v,history:[...(p.history||[]),{from:p.sell,to:v,at:Date.now()}]});say(t(`${p.name} ab ${fm(v)} per ${UL[p.unit]}.`,`${p.name} is now ${fm(v)} per ${UL[p.unit]}.`))})}
   if(has(W.SELL)&&items.length){const lines=linesOf(items);if(!lines)return;const tot=Math.round(lines.reduce((a,l)=>a+l.amount,0));
     const sh=short(lines),w=sh?t(`Dhyan do: ${sh}. `,`Careful: ${sh}. `):'';
-    return confirmAsk(w+t(`${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} becha, ${fm(tot)}. Save karun?`,`Sold ${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} for ${fm(tot)}. Save it?`),()=>{recordSale(lines);say(t('Sale save ho gayi, stock kam kar diya.','Sale saved and stock lowered.'))})}
+    return confirmAsk(w+t(`${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} becha, ${fm(tot)}. Save karun?`,`Sold ${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} for ${fm(tot)}. Save it?`),()=>{const tt=recordSale(lines);say(t('Sale save ho gayi, stock kam kar diya.','Sale saved and stock lowered.'));showPay(tt)})}
   if(has(W.STOCK)&&items.length){const it=items[0],p=it.p;
     if(it.qty!=null&&!has(W.KITNA)){const q=toBase(it.qty,it.unit,p);if(q!=null)return confirmAsk(t(`${p.name} ka stock ${fq(q,p.unit)} set karun?`,`Set ${p.name} stock to ${fq(q,p.unit)}?`),()=>{saveProduct({...p,qty:q});say(t('Stock theek kar diya.','Stock corrected.'))})}
     return say(items.map(i=>`${i.p.name}: ${fq(i.p.qty,i.p.unit)} ${t('bacha hai','left')}`).join('\n'))}
   if(!items.length&&has(W.STOCK))return say(t('Kis cheez ka stock? Aise bolo: "sugar ka stock 25 kilo hai" ya "10 litre milk aaya".','Stock of what? Say "set sugar stock to 25 kg" or "add 10 litre milk".'));
   if(!items.length){
-    if(!fromAI&&S.products.length){const line=await aiRewrite(text);if(line){const l=S.lang;await handle(line.replace(/^price\s+/i,''),true);S.lang=l;return}}
+    if(!fromAI&&S.products.length){const line=await aiRewrite(text);if(line){const l=S.lang;await handle(line.replace(/^price\s+/i,''),true);S.lang=l;
+        const R3=parseItems(tokenize(line)),unk=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k.length>=3&&!Object.values(W).some(w=>inS(w,x)));
+        if(!S.pending&&R3.items.length===1&&unk.length>=1&&unk.length<=2){const p=R3.items[0].p,nm=unk.map(x=>x.raw).join(' ');S.aliasOffer={pid:p.id,nm};
+          say(t(`"${nm}" ko ${p.name} ka naam save karun? Agli baar turant samjhunga.`,`Save "${nm}" as a name for ${p.name}? Next time I will know it straight away.`),[[t('Haan, save karo','Yes, save it'),'#alias',1]])}
+        return}}
     return say(t('Samajh nahi aaya. Aise bolo: "2 litre dudh kitne ka hai?", "cheeni add karo", "1 kilo sugar becha".','I did not catch that. Try: "price of 2 litre milk", "add sugar", "sold 1 kg sugar".'))}
   const lines=linesOf(items);if(!lines)return;
   if(lines.length===1){const l=lines[0],one=items[0].qty==null&&!items[0].unit;S.quote=lines;
     return say(one?`${l.name} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${l.name} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
   S.quote=lines;
   say(lines.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[t('Iska bill banao','Make this a bill'),'#bill',1]])}
-function addToBill(lines){for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
+function addToBill(lines){$('payBox').innerHTML='';for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
 
 function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p:null,name:it?null:left.map(x=>x.raw).join(' ')||null,qty:null,unit:null,cost:null,sell:null,exp:it?null:undefined};
   const nr=(i,set,d)=>[d,2*d].some(o=>toks[i+o]&&inS(set,toks[i+o]));
@@ -493,7 +615,7 @@ const billTotal=()=>Math.round(S.bill.reduce((a,l)=>a+l.amount,0));
 const short=lines=>lines.filter(l=>{const p=S.products.find(x=>x.id===l.id);return p&&l.qty>p.qty}).map(l=>{const p=S.products.find(x=>x.id===l.id);return t(`${p.name} sirf ${fq(p.qty,p.unit)} bacha hai`,`only ${fq(p.qty,p.unit)} of ${p.name} left`)}).join(', ');
 function confirmBill(force){if(!S.bill.length)return say(t('Bill khali hai.','The bill is empty.'));
   const sh=short(S.bill);if(sh&&force!==true)return say(t(`Ruko: ${sh}. Phir bhi bechna hai?`,`Wait: ${sh}. Sell anyway?`),[[t('Haan, becho','Yes, sell'),'#forcebill',1],[t('Nahi','No'),'nahi']]);
-  const tot=recordSale(S.bill);S.bill=[];renderBill();say(t(`Bill pakka, total ${fm(tot)}. Stock kam kar diya.`,`Bill confirmed, total ${fm(tot)}. Stock lowered.`))}
+  const tot=recordSale(S.bill);S.bill=[];renderBill();say(t(`Bill pakka, total ${fm(tot)}. Stock kam kar diya.`,`Bill confirmed, total ${fm(tot)}. Stock lowered.`));showPay(tot);return tot}
 const daysTo=d=>Math.ceil((new Date(d)-Date.now())/864e5);
 function expiryList(){const l=S.products.filter(p=>p.expiry&&daysTo(p.expiry)<=7);
   say(l.length?l.map(p=>`${p.name}: ${daysTo(p.expiry)<0?t('expire ho gaya','expired'):p.expiry}`).join('\n'):t('Is hafte kuch expire nahi ho raha.','Nothing expires this week.'))}
@@ -504,10 +626,10 @@ function renderBill(){const b=$('bill');b.hidden=!S.bill.length;$('billEmpty').h
   b.innerHTML=`<h2>Bill</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td><td><button type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody>
   <tfoot><tr><td colspan="3">Total</td><td class="n">${fm(billTotal())}</td><td></td></tr></tfoot></table>
   <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">Confirm sale</button><button class="btn" id="b-clear">Clear</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`;
-  b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);renderBill()});$('b-ok').onclick=confirmBill;$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
+  b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);renderBill()});$('b-ok').onclick=()=>confirmBill();$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
 function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
   const low=ps.filter(p=>p.low&&p.qty<=p.low).length,exp=ps.filter(p=>p.expiry&&daysTo(p.expiry)<=7).length;
-  $('alerts').textContent=[low&&low+' low on stock',exp&&exp+' expiring within a week'].filter(Boolean).join(' · ');
+  $('alerts').textContent=[low&&low+' low on stock',exp&&exp+' expiring within a week'].filter(Boolean).join(' · ');$('reorderBtn').hidden=!lowItems().length;
   $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?'<span class="pill">Low</span>':''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?'Expired':'Expires '+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
    <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?' · cost '+fm(p.cost):''}</span></button>`).join('')
    :'<p class="empty">No products yet. Tap Add product, or tell the assistant "cheeni add karo".</p>'}
@@ -519,7 +641,7 @@ function renderQuick(){const el=$('quick');el.innerHTML='';[...S.products].sort(
 const WHY={restock:['Aaya','Restock'],sale:['Bika','Sale'],set:['Sudhar','Correction'],create:['Naya product','New product']};
 const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(m.name)}</span><span class="p" style="font-weight:400">${t(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+t('ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
 function renderMoves(){$('moveList').innerHTML=S.moves.length?S.moves.slice(0,60).map(moveRow).join(''):'<p class="empty">'+t('Abhi koi stock badlav nahi.','No stock changes yet.')+'</p>'}
-function renderAll(){renderStock();renderSales();renderQuick();renderMoves()}
+function renderAll(){renderStock();renderSales();renderQuick();renderMoves();renderKhata();renderInfo()}
 
 function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p;p=p||{};
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';const lg=S.moves.filter(m=>m.pid===S.editing).slice(0,6);$('f-log').innerHTML=lg.length?'<b>'+t('Pichhle badlav','Recent changes')+'</b>'+lg.map(moveRow).join(''):'';$('f-name').focus()}
@@ -541,7 +663,7 @@ try{$('costOn').checked=!!localStorage.getItem('cost');$('speakOn').checked=!!lo
 let mode='talk';
 /* Ask and Sell share one mic panel; it moves to whichever of the two tabs is open. */
 function showTab(name){document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===name));
-  ['talk','stock','sales','shop'].forEach(n=>$('pane-'+n).hidden=n!==name);
+  ['talk','stock','sales','khata','shop'].forEach(n=>$('pane-'+n).hidden=n!==name);
   if(name==='talk'||name==='sales'){mode=name;$('pane-'+name).append($('panel'));setLang(S.lang,true)}}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 /* Mic button: uses the browser's speech recognition where the page is allowed the microphone; otherwise opens the keyboard so its mic key can be used. */
@@ -558,6 +680,9 @@ $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechReco
     rec.onend=()=>{listening=false;$('mic').classList.remove('on');$('micLabel').textContent=t('Tap karke bolo','Tap and speak');
       const v=(fin||(got?$('say').value:'')).trim();if(v){$('say').value='';viaMic=true;handle(v)}};
     rec.start()}catch(e){micFallback('The microphone could not start.')}};
+$('k-form').onsubmit=e=>{e.preventDefault();khataForm(1)};$('k-paid').onclick=()=>khataForm(-1);
+$('khataList').onclick=e=>{if(e.target.closest('a'))return;const b=e.target.closest('.item');if(b){S.kOpen=S.kOpen===b.dataset.c?null:b.dataset.c;renderKhata()}};
+$('reorderBtn').onclick=()=>{showTab('talk');handle(t('kya mangwana hai','reorder list'))};
 $('composer').onsubmit=e=>{e.preventDefault();viaMic=false;const v=$('say').value;$('say').value='';handle(v)};
 $('voiceAdd').onclick=()=>{showTab('talk');S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};viaMic=true;advanceAdd();if(!$('speakOn').checked)$('mic').click()};
 
@@ -578,14 +703,17 @@ setLang(L0,true);greet();
 (async()=>{const c=window.claude;
   try{db=c?await c.use('db'):null}catch(e){db=null}
   try{sample=c?await c.use('sample'):null}catch(e){sample=null}
-  if(!db){let ok=false;try{const d=JSON.parse(localStorage.getItem('shop')||'null');if(d){S.products=d.products||[];S.sales=d.sales||[];S.moves=d.moves||[]}else if(window.SEED)S.products=window.SEED;localStorage.setItem('shop-ok','1');ok=true}catch(e){}
+  if(!db){let ok=false;try{const d=JSON.parse(localStorage.getItem('shop')||'null');if(d)restore(d);else if(window.SEED)S.products=window.SEED;localStorage.setItem('shop-ok','1');ok=true}catch(e){}
     renderAll();$('status').textContent=ok?'Saved on this device':'Changes are not saved in this browser';
-    if(location.protocol.startsWith('http')&&!c){$('shopTab').hidden=false;renderShop();cloudInit().catch(e=>{$('shopMsg').textContent='Cloud is not reachable: '+(e.message||e)})}
+    if(location.protocol.startsWith('http')&&!c){$('shopBox').hidden=false;renderShop();cloudInit().catch(e=>{$('shopMsg').textContent='Cloud is not reachable: '+(e.message||e)})}
     return}
   $('status').textContent='Saved to your shop';
   const fail=e=>{$('status').textContent='Offline: '+(e.message||e.code)};
   db.collection('products').onSnapshot(s=>{S.products=s.docs.map(d=>({id:d.id,...d.data()}));renderAll()},fail);
   db.collection('moves').orderBy('at','desc').limit(200).onSnapshot(s=>{S.moves=s.docs.map(d=>d.data());renderMoves()},()=>{});
+  db.collection('customers').onSnapshot(s=>{S.customers=s.docs.map(d=>({id:d.id,...d.data()}));renderKhata()},()=>{});
+  db.collection('khata').orderBy('at','desc').limit(1000).onSnapshot(s=>{S.khata=s.docs.map(d=>({id:d.id,...d.data()}));renderKhata()},()=>{});
+  db.doc('meta/shop').onSnapshot(d=>{if(d.exists){S.shop={name:'',upi:'',...d.data()};renderInfo()}},()=>{});
   db.collection('sales').orderBy('at','desc').limit(100).onSnapshot(s=>{S.sales=s.docs.map(d=>d.data());renderSales()},fail);
 })();
 </script>
