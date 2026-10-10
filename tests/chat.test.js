@@ -144,7 +144,10 @@ for(const [name,flags,says,want,end] of cases){
   if(flags.includes('voiceadd')){S.pending={type:'add',p:null,name:null,qty:null,unit:null,cost:null,sell:null,exp:undefined};advanceAdd()}
   if(flags.includes('samples'))loadSamples();
   for(const m of says){await handle(m);await new Promise(r=>setTimeout(r,5))}
-  const all=log.join(' | '),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
+  /* names and units are shown in the chosen language; the cases below are written with the stored English names */
+  const back=[];for(const k in PNAMES){const e=S.products.map(p=>p.name).concat(['Sugar','Milk','Toor Dal','Moong Dal','Parle-G','Rice','Atta','Potato','Onion','Curd','Paneer','Bread','Eggs','Tea','Salt','Soap','Ghee','Besan','Maggi','Sunflower Oil','Haldi','Ragi','Dal']).find(n=>n.toLowerCase().replace(/[^a-z]/g,'')===k);if(e){back.push([PNAMES[k].hi,e]);back.push([PNAMES[k].mr,e])}}
+  back.sort((a,b)=>b[0].length-a[0].length);const un=s=>{for(const [f,e] of back)if(f!==e)s=s.split(f).join(e);return s.split('लिटर').join('litre').split('किलो').join('kg').split('पॅकेट').join('packet').split('नग').join('piece').split(' kilo').join(' kg')};
+  const all=un(log.join(' | ')),q=id=>(S.products.find(p=>p.id===id)||{}).qty;let ok=want.test(all);
   if(end)for(const k in end)ok=ok&&(k==='bill'?S.bill.length===end[k]:k==='moves'?S.moves.length===end[k]:k==='khata'?S.khata.length===end[k]:k==='batches'?(S.products.find(p=>p.id==='milk').batches||[]).length===end[k]:q(k)===end[k]);
   if(!ok){fail++;console.log('FAIL',name,'\\n   got:',all,end?JSON.stringify({milk:q('milk'),sugar:q('sugar'),bill:S.bill.length,moves:S.moves.length,khata:S.khata.length}):'')}
 }

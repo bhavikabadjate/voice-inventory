@@ -363,7 +363,13 @@ const S={customers:[],khata:[],shop:{name:'',upi:''},lastSale:null,moves:[],prod
 let db=null,sample=null,dbWarned=0;
 /* A write to the page's database failed: say so once in the chat and keep it in the status line. */
 const dbFail=e=>{const m='Not saved: '+(e&&e.code==='quota_exceeded'?'the shop database is full':e&&e.code==='invalid_argument'?'you can view this shop but not change it':(e&&(e.message||e.code))||'unknown error');$('status').textContent=m;if(!dbWarned++)say(m+'.')};
-const UL={L:'litre',kg:'kg',pc:'piece',packet:'packet'};
+/* Unit words and product names follow the chosen language. Products keep one stored name; what is shown comes from this list, or for Marathi from the product's own Devanagari other-name. */
+const UNITS={en:{L:'litre',kg:'kg',pc:'piece',packet:'packet'},hi:{L:'litre',kg:'kilo',pc:'piece',packet:'packet'},mr:{L:'लिटर',kg:'किलो',pc:'नग',packet:'पॅकेट'}};
+const UL=new Proxy({},{get:(o,k)=>(UNITS[S.lang]||UNITS.en)[k]});
+const PNAMES={};`Milk|Doodh|दूध;Sugar|Cheeni|साखर;Atta|Atta|कणीक;Rice|Chawal|तांदूळ;Toor Dal|Toor Dal|तूर डाळ;Moong Dal|Moong Dal|मूग डाळ;Chana Dal|Chana Dal|हरभरा डाळ;Urad Dal|Urad Dal|उडीद डाळ;Masoor Dal|Masoor Dal|मसूर डाळ;Dal|Dal|डाळ;Besan|Besan|बेसन;Ghee|Ghee|तूप;Salt|Namak|मीठ;Mirchi Powder|Lal Mirch|तिखट;Haldi|Haldi|हळद;Tea|Chai Patti|चहा;Coffee|Coffee|कॉफी;Onion|Pyaaz|कांदा;Potato|Aloo|बटाटा;Tomato|Tamatar|टोमॅटो;Garlic|Lahsun|लसूण;Ginger|Adrak|आले;Maggi|Maggi|मॅगी;Detergent|Detergent|डिटर्जंट;Soap|Sabun|साबण;Agarbatti|Agarbatti|उदबत्ती;Curd|Dahi|दही;Paneer|Paneer|पनीर;Bread|Bread|ब्रेड;Eggs|Ande|अंडी;Egg|Anda|अंडे;Sunflower Oil|Sunflower Tel|सूर्यफूल तेल;Oil|Tel|तेल;Mustard Oil|Sarson Tel|मोहरी तेल;Groundnut Oil|Moongfali Tel|शेंगदाणा तेल;Parle-G|Parle-G|पार्ले-जी;Biscuit|Biscuit|बिस्किट;Ragi|Ragi|नाचणी;Suji|Suji|रवा;Rava|Suji|रवा;Poha|Poha|पोहे;Maida|Maida|मैदा;Jeera|Jeera|जिरे;Dhaniya|Dhaniya|धणे;Rai|Rai|मोहरी;Sabudana|Sabudana|साबुदाणा;Peanuts|Moongfali|शेंगदाणे;Jaggery|Gud|गूळ;Butter|Makhan|लोणी;Matchbox|Machis|काडेपेटी;Toothpaste|Toothpaste|टूथपेस्ट;Shampoo|Shampoo|शॅम्पू;Chips|Chips|चिप्स;Potato Chips|Aloo Chips|बटाटा चिप्स;Water|Paani|पाणी;Jowar|Jowar|ज्वारी;Bajra|Bajra|बाजरी;Wheat|Gehun|गहू;Lemon|Nimbu|लिंबू;Coconut|Nariyal|नारळ`.split(';').forEach(r=>{const [e,h,m]=r.split('|');PNAMES[e.toLowerCase().replace(/[^a-z]/g,'')]={hi:h,mr:m}});
+function dn(o){const name=typeof o==='string'?o:(o&&o.name)||'';if(S.lang==='en'||!name)return name;const d=PNAMES[name.toLowerCase().replace(/[^a-z]/g,'')];if(d)return d[S.lang];
+  if(S.lang==='mr'){const p=typeof o==='object'&&o.names?o:S.products.find(x=>x.name===name),dev=p&&(p.names||[]).filter(x=>/[\u0900-\u097F]/.test(x));if(dev&&dev.length)return dev[dev.length-1]}
+  return name}
 const fm=x=>'₹'+(Math.round(x*100)/100).toLocaleString('en-IN');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function fq(q,u){q=Math.round(q*1000)/1000;
@@ -783,8 +789,8 @@ function reorderPlan(){const now=Date.now(),D=864e5,first=S.sales.length?Math.mi
   return S.products.map(p=>{const rate=(sold[p.name]||0)/days,need=rate*7-p.qty,isLow=(p.low>0&&p.qty<=p.low)||p.qty<=0;if(!(need>0)&&!isLow)return null;
     const want=need>0?need:Math.max(p.low*2-p.qty,p.low||1);return{p,rate,order:up(want,p.unit),daysLeft:rate>0?Math.floor(p.qty/rate):null}}).filter(Boolean).sort((a,b)=>(a.daysLeft??99)-(b.daysLeft??99))}
 function reorder(){const l=reorderPlan();if(!l.length)return say(tm('सध्या काही मागवायची गरज नाही. Stock टॅबमध्ये प्रत्येक वस्तूची किमान पातळी ठरवू शकता.','Abhi kuch mangwane ki zaroorat nahi. Stock tab mein har cheez ka low-stock level set kar sakte ho.','Nothing needs reordering. You can set a low-stock level per product in the Stock tab.'));
-  const lines=l.map(x=>`${x.p.name}: ${fq(x.order,x.p.unit)} ${t('mangwao','to order')} (${fq(x.p.qty,x.p.unit)} ${tm('शिल्लक','bacha','left')}${x.daysLeft!=null?t(`, ${x.daysLeft} din chalega`,`, lasts ${x.daysLeft} days`):''})`);
-  S.lastMsg=`${S.shop.name?S.shop.name+' - ':''}Order:\n`+l.map(x=>`- ${x.p.name}: ${fq(x.order,x.p.unit)}`).join('\n');
+  const lines=l.map(x=>`${dn(x.p)}: ${fq(x.order,x.p.unit)} ${t('mangwao','to order')} (${fq(x.p.qty,x.p.unit)} ${tm('शिल्लक','bacha','left')}${x.daysLeft!=null?t(`, ${x.daysLeft} din chalega`,`, lasts ${x.daysLeft} days`):''})`);
+  S.lastMsg=`${S.shop.name?S.shop.name+' - ':''}Order:\n`+l.map(x=>`- ${dn(x.p)}: ${fq(x.order,x.p.unit)}`).join('\n');
   say(tm('हे मागवायचे आहे:\n','Yeh mangwana hai:\n','To reorder:\n')+lines.join('\n')+(S.sales.length?t('\n(1 hafte ki bikri ke hisaab se)','\n(based on about a week of sales)'):''),[[tm('WhatsApp वर पाठवा','WhatsApp par bhejo','Send on WhatsApp'),'https://wa.me/?text='+encodeURIComponent(S.lastMsg),1],[t('Copy karo','Copy'),'#copy']])}
 
 /* ---------- other names for a product: built-in list first, then Claude ---------- */
@@ -864,7 +870,7 @@ async function photoProduct(){const m=$('alerts');if(!aiReady()){m.textContent=N
   const r=parseJSON(await ai('product_photo',{},img)||'','{');m.textContent='';
   if(!r||!r.name){m.textContent=t('Pack nahi padh paya. Naam wali side saaf dikhao.','Could not read the pack. Show the side with the name clearly.');return}
   const nm=(r.name+(r.size?' '+r.size:'')).trim(),dup=S.products.find(x=>[x.name,...(x.names||[])].some(n=>key2(n)===key2(nm)));
-  if(dup){openEdit(dup);m.textContent=t(`"${dup.name}" pehle se hai.`,`"${dup.name}" is already in your stock.`);return}
+  if(dup){openEdit(dup);m.textContent=t(`"${dn(dup)}" pehle se hai.`,`"${dn(dup)}" is already in your stock.`);return}
   openEdit(null);$('f-name').value=nm;$('f-names').value=(Array.isArray(r.other_names)?r.other_names:[]).slice(0,4).join(', ');$('f-unit').value=['packet','pc','kg','L'].includes(r.unit)?r.unit:'packet';if(+r.mrp>0)$('f-sell').value=+r.mrp;
   m.textContent=t('Photo se bhara hai. Jaanch lo, quantity aur kharid rate daalo, phir Save.','Filled from the photo. Check it, add quantity and cost, then Save.')}
 
@@ -890,8 +896,8 @@ function oddList(){const now=Date.now(),D=864e5,out=[],loss={};
   S.moves.filter(m=>m.reason==='set'&&m.delta<0&&!m.undo&&m.at>now-30*D).forEach(m=>{const g=loss[m.name]=loss[m.name]||{q:0,unit:m.unit,n:0};g.q+=-m.delta;g.n++});
   Object.entries(loss).sort((a,b)=>b[1].q-a[1].q).slice(0,4).forEach(([n,g])=>{const p=S.products.find(x=>x.name===n);out.push(t(`${n}: stock ${g.n} baar sudhaar kar ${fq(g.q,g.unit)} kam kiya gaya, bina bikri ke${p?` (lagbhag ${fm(g.q*p.sell)} ka maal)`:''}.`,`${n}: stock was corrected down ${g.n} time(s) by ${fq(g.q,g.unit)} with no sale${p?` (about ${fm(g.q*p.sell)} of goods)`:''}.`))});
   const und=S.sales.filter(x=>x.total<0&&x.at>now-7*D).length;if(und>=3)out.push(t(`Is hafte ${und} bikri wapas ki gayi.`,`${und} sales were undone this week.`));
-  S.products.forEach(p=>{const ch=(p.history||[]).filter(h=>h.at>now-7*D).length;if(ch>=3)out.push(t(`${p.name} ka rate is hafte ${ch} baar badla.`,`${p.name}'s price changed ${ch} times this week.`))});
-  S.products.filter(p=>p.cost!=null&&p.sell<p.cost).slice(0,3).forEach(p=>out.push(t(`${p.name} kharid se kam rate par bik raha hai.`,`${p.name} is selling below its cost price.`)));
+  S.products.forEach(p=>{const ch=(p.history||[]).filter(h=>h.at>now-7*D).length;if(ch>=3)out.push(t(`${dn(p)} ka rate is hafte ${ch} baar badla.`,`${dn(p)}'s price changed ${ch} times this week.`))});
+  S.products.filter(p=>p.cost!=null&&p.sell<p.cost).slice(0,3).forEach(p=>out.push(t(`${dn(p)} kharid se kam rate par bik raha hai.`,`${dn(p)} is selling below its cost price.`)));
   S.customers.forEach(c=>{const es=S.khata.filter(e=>e.cid===c.id),b=balance(c.id);if(b<=0||!es.length)return;const lastPay=Math.max(0,...es.filter(e=>e.amount<0).map(e=>e.at)),first=Math.min(...es.map(e=>e.at));
     if(now-Math.max(lastPay,first)>30*D)out.push(t(`${c.name} ne 30 din se kuch jama nahi kiya, ${fm(b)} baki.`,`${c.name} has paid nothing for 30 days and owes ${fm(b)}.`))});
   return out}
@@ -902,9 +908,9 @@ async function weekly(){const f=shopFacts(),odd=oddList(),plan=reorderPlan().sli
   if(!S.sales.length)return say(t('Is hafte ki koi bikri darj nahi hai.','No sales are recorded for this week.'));
   say(t('Hafte ka hisaab bana raha hoon…','Putting the week together…'));
   let txt=await ai('weekly',{...f,products:f.products.slice(0,25),toReorder:plan.map(x=>({name:x.p.name,order:fq(x.order,x.p.unit)})),odd,lang:aiLang()});
-  if(!txt){const top=f.products.filter(p=>p.sold7d>0).slice(0,3).map(p=>`${p.name} ${fm(p.revenue7d)}`).join(', '),dead=f.products.filter(p=>p.stock>0&&p.sold30d===0).slice(0,3).map(p=>p.name).join(', ');
+  if(!txt){const top=f.products.filter(p=>p.sold7d>0).slice(0,3).map(p=>`${dn(p)} ${fm(p.revenue7d)}`).join(', '),dead=f.products.filter(p=>p.stock>0&&p.sold30d===0).slice(0,3).map(p=>p.name).join(', ');
     txt=[t(`Is hafte ${fm(f.last7days.sales)} bika (${f.last7days.bills} bill), pichhle hafte ${fm(f.previous7days.sales)}.`,`This week: ${fm(f.last7days.sales)} in ${f.last7days.bills} bills. Last week: ${fm(f.previous7days.sales)}.`),
-      top&&t(`Sabse zyada: ${top}.`,`Best sellers: ${top}.`),plan.length&&t(`Mangwana hai: ${plan.map(x=>`${x.p.name} ${fq(x.order,x.p.unit)}`).join(', ')}.`,`To reorder: ${plan.map(x=>`${x.p.name} ${fq(x.order,x.p.unit)}`).join(', ')}.`),
+      top&&t(`Sabse zyada: ${top}.`,`Best sellers: ${top}.`),plan.length&&t(`Mangwana hai: ${plan.map(x=>`${dn(x.p)} ${fq(x.order,x.p.unit)}`).join(', ')}.`,`To reorder: ${plan.map(x=>`${dn(x.p)} ${fq(x.order,x.p.unit)}`).join(', ')}.`),
       dead&&f.daysOfSalesHistory>=7&&t(`Nahi bik raha: ${dead}.`,`Not selling: ${dead}.`),f.creditOwed.total>0&&t(`Udhaar baki: ${fm(f.creditOwed.total)}.`,`Credit owed: ${fm(f.creditOwed.total)}.`),...odd.slice(0,2)].filter(Boolean).join('\n')}
   S.lastMsg=(S.shop.name?S.shop.name+'\n':'')+txt;
   say(txt,[[t('Khud ko WhatsApp karo','Send to WhatsApp'),'https://wa.me/?text='+encodeURIComponent(S.lastMsg),1],[t('Copy karo','Copy'),'#copy']],f.hasCostData?t('Hafte ka hisaab screen par hai.','The weekly summary is on the screen.'):txt)}
@@ -917,9 +923,9 @@ async function writeMessage(text,toks,has){const nm=toks.filter(x=>x.num===undef
   if(kind==='reminder'&&!(b>0))return say(t(`${c.name} ka kuch baki nahi hai.`,`${c.name} owes nothing.`));
   if(kind==='order'&&!plan.length)return say(t('Abhi mangwane ko kuch nahi hai.','Nothing needs ordering right now.'));
   say(t('Message likh raha hoon…','Writing the message…'));
-  let msg=await ai('message',{kind,request:text,shop,lang:aiLang(),customer:c?c.name:undefined,amountOwed:c?b:undefined,upiId:kind==='reminder'&&S.shop.upi?S.shop.upi:undefined,items:plan.length?plan.map(x=>`${x.p.name} ${fq(x.order,x.p.unit)}`):undefined});
+  let msg=await ai('message',{kind,request:text,shop,lang:aiLang(),customer:c?c.name:undefined,amountOwed:c?b:undefined,upiId:kind==='reminder'&&S.shop.upi?S.shop.upi:undefined,items:plan.length?plan.map(x=>`${dn(x.p)} ${fq(x.order,x.p.unit)}`):undefined});
   if(!msg)msg=kind==='reminder'?remindText(c,b)
-    :kind==='order'?t(`Namaste, ${shop?shop+' se ':''}yeh order bhej dijiye:\n`,`Hello, please send this order${shop?' for '+shop:''}:\n`)+plan.map(x=>`- ${x.p.name}: ${fq(x.order,x.p.unit)}`).join('\n')+t('\nDhanyavaad.','\nThank you.')
+    :kind==='order'?t(`Namaste, ${shop?shop+' se ':''}yeh order bhej dijiye:\n`,`Hello, please send this order${shop?' for '+shop:''}:\n`)+plan.map(x=>`- ${dn(x.p)}: ${fq(x.order,x.p.unit)}`).join('\n')+t('\nDhanyavaad.','\nThank you.')
     :kind==='offer'?t(`Namaste! ${shop||'Hamari dukaan'} par is hafte khaas offer chal raha hai. Zaroor padhaariye. Dhanyavaad.`,`Hello! ${shop||'Our shop'} has special offers this week. Do visit us. Thank you.`):null;
   if(!msg)return say(NEED_AI());
   S.lastMsg=msg;say(msg,[[t('WhatsApp par bhejo','Send on WhatsApp'),'https://wa.me/'+(kind==='reminder'&&c.phone?c.phone:'')+'?text='+encodeURIComponent(msg),1],[t('Copy karo','Copy'),'#copy']])}
@@ -938,11 +944,11 @@ function shopFacts(){const now=Date.now(),D=864e5,cost=canCost(),r=x=>Math.round
     creditOwed:{total:r(S.customers.reduce((a,c)=>a+Math.max(balance(c.id),0),0)),top:S.customers.map(c=>({name:c.name,owes:balance(c.id)})).filter(x=>x.owes>0).sort((a,b)=>b.owes-a.owes).slice(0,5)}}}
 /* Used when Claude is not reachable: plain observations from the same numbers. */
 function localAdvice(f){const out=[],ps=f.products,sold=ps.filter(p=>p.sold7d>0);
-  if(sold[0])out.push(t(`Sabse zyada bikne wala: ${sold[0].name} (${fm(sold[0].revenue7d)} is hafte). Iska stock kabhi khatam mat hone do.`,`Best seller: ${sold[0].name} (${fm(sold[0].revenue7d)} this week). Never let it run out.`));
-  const run=sold.filter(p=>p.daysOfStockLeft!=null&&p.daysOfStockLeft<=3).slice(0,3);if(run.length)out.push(t(`Jaldi mangwao: ${run.map(p=>`${p.name} (${p.daysOfStockLeft} din ka stock)`).join(', ')}.`,`Reorder soon: ${run.map(p=>`${p.name} (${p.daysOfStockLeft} days of stock)`).join(', ')}.`));
+  if(sold[0])out.push(t(`Sabse zyada bikne wala: ${dn(sold[0])} (${fm(sold[0].revenue7d)} is hafte). Iska stock kabhi khatam mat hone do.`,`Best seller: ${dn(sold[0])} (${fm(sold[0].revenue7d)} this week). Never let it run out.`));
+  const run=sold.filter(p=>p.daysOfStockLeft!=null&&p.daysOfStockLeft<=3).slice(0,3);if(run.length)out.push(t(`Jaldi mangwao: ${run.map(p=>`${dn(p)} (${p.daysOfStockLeft} din ka stock)`).join(', ')}.`,`Reorder soon: ${run.map(p=>`${dn(p)} (${p.daysOfStockLeft} days of stock)`).join(', ')}.`));
   const dead=ps.filter(p=>p.stock>0&&p.sold30d===0).slice(0,3);if(dead.length&&f.daysOfSalesHistory>=7)out.push(t(`Yeh nahi bik raha: ${dead.map(p=>p.name).join(', ')}. Chhota offer ya combo try karo, aur kam mangwao.`,`Not selling: ${dead.map(p=>p.name).join(', ')}. Try a small offer or combo, and order less.`));
   const exp=ps.filter(p=>p.expiresInDays!=null&&p.expiresInDays<=7&&p.stock>0);if(exp.length)out.push(t(`Expire hone wala: ${exp.map(p=>p.name).join(', ')}. Pehle isse becho.`,`Expiring soon: ${exp.map(p=>p.name).join(', ')}. Sell these first.`));
-  if(f.hasCostData){const thin=sold.filter(p=>p.marginPct!=null&&p.marginPct<8).slice(0,3);if(thin.length)out.push(t(`Kam margin: ${thin.map(p=>`${p.name} (${p.marginPct}%)`).join(', ')}. Rate ya supplier dekho.`,`Thin margin: ${thin.map(p=>`${p.name} (${p.marginPct}%)`).join(', ')}. Review the price or supplier.`))}
+  if(f.hasCostData){const thin=sold.filter(p=>p.marginPct!=null&&p.marginPct<8).slice(0,3);if(thin.length)out.push(t(`Kam margin: ${thin.map(p=>`${dn(p)} (${p.marginPct}%)`).join(', ')}. Rate ya supplier dekho.`,`Thin margin: ${thin.map(p=>`${dn(p)} (${p.marginPct}%)`).join(', ')}. Review the price or supplier.`))}
   if(f.creditOwed.total>0)out.push(t(`Udhaar ${fm(f.creditOwed.total)} baki hai${f.creditOwed.top[0]?`, sabse zyada ${f.creditOwed.top[0].name} ka`:''}. Reminder bhejo.`,`${fm(f.creditOwed.total)} is out on credit${f.creditOwed.top[0]?`, most of it with ${f.creditOwed.top[0].name}`:''}. Send reminders.`));
   if(f.previous7days.sales>0)out.push(t(`Is hafte ${fm(f.last7days.sales)} bika, pichhle hafte ${fm(f.previous7days.sales)}.`,`This week ${fm(f.last7days.sales)}, last week ${fm(f.previous7days.sales)}.`));
   return out.length?out.map((x,i)=>`${i+1}. ${x}`).join('\n'):t('Abhi salah dene ke liye kaafi bikri ka data nahi hai. Kuch din bill banao, phir pucho.','There is not enough sales data yet to advise on. Make bills for a few days, then ask again.')}
@@ -964,7 +970,7 @@ async function advise(question){const f=shopFacts();let ans='',viaAI=false;
 
 /* After a new product is added by voice, suggest other names it might be called by. */
 async function offerNames(p){if(!p)return;const list=await suggestNames(p.name,p.names);if(!list.length||!S.products.some(x=>x.id===p.id))return;S.nameOffer={pid:p.id,list};
-  say(t(`${p.name} ko log aur kis naam se bolte hain? Jo sahi ho woh chuno.`,`What else do people call ${p.name}? Pick the ones that are right.`),[...list.map((n,i)=>[n,'#nm:'+i]),[t('Sab jodo','Add all'),'#nm:all',1]])}
+  say(t(`${dn(p)} ko log aur kis naam se bolte hain? Jo sahi ho woh chuno.`,`What else do people call ${dn(p)}? Pick the ones that are right.`),[...list.map((n,i)=>[n,'#nm:'+i]),[t('Sab jodo','Add all'),'#nm:all',1]])}
 /* Words that mark small talk, so it is not mistaken for a question about a product. */
 const CHAT=new Set('kaisa kaisi kaise kese kyun kyu kab kahan kaun why when where who weather mausam time samay hello hi namaste thanks thank dhanyavad shukriya bye tum aap naam what can you help madad raha rahi rahe hua hui gaya gayi tha thi please batao dikhao karna chahiye'.split(' ').map(key2));
 const HELLO=new Set('hello hi namaste namaskar hey'.split(' ').map(key2)),THANKS=new Set('thanks thank dhanyavad shukriya ok okay theek thik accha acha bye'.split(' ').map(key2)),HELPW=new Set('help madad sahayata'.split(' ').map(key2));
@@ -1023,7 +1029,7 @@ async function dbCheck(report){const out=[],add=(name,ok,detail,opt)=>{out.push(
   try{await A.auth.signOut();await B.auth.signOut();await C.auth.signOut()}catch(e){}
   return out}
 async function runDbCheck(){const btn=$('diagBtn'),box=$('diagOut'),stat=$('diagS');btn.disabled=true;stat.textContent=tm('चालू आहे…','Chal raha hai…','Running…');
-  const draw=r=>{box.innerHTML=r.map(x=>`<div class="drow ${x.ok?'ok':x.opt?'opt':'no'}"><b>${x.ok?'✓':x.opt?'–':'✕'}</b><span>${esc(x.name)}${x.detail?`<small>${esc(x.detail)}</small>`:''}</span></div>`).join('')};
+  const draw=r=>{box.innerHTML=r.map(x=>`<div class="drow ${x.ok?'ok':x.opt?'opt':'no'}"><b>${x.ok?'✓':x.opt?'–':'✕'}</b><span>${esc(dn(x))}${x.detail?`<small>${esc(x.detail)}</small>`:''}</span></div>`).join('')};
   let r=[];try{r=await dbCheck(draw)}catch(e){r.push({name:'The check itself',ok:false,detail:e.message||String(e)});draw(r)}
   const bad=r.filter(x=>!x.ok&&!x.opt).length,opt=r.filter(x=>x.opt).length,good=r.filter(x=>x.ok).length,extra=opt?tm(`, ${opt} ऐच्छिक गोष्टी बाकी`,`, ${opt} optional cheezein baaki`,`, ${opt} optional not set up`):'';
   stat.textContent=(bad?tm(`${bad} अडचणी`,`${bad} dikkat mili`,`${bad} problem${bad>1?'s':''} found`):tm(`${good} तपासण्या ठीक`,`${good} jaanch theek`,`${good} checks passed`))+extra;btn.disabled=false;if(!db&&r.some(x=>/supabase-setup\.sql/.test(x.detail)))box.insertAdjacentHTML('beforeend',`<p class="hint" style="margin-top:8px"><a href="supabase-setup.sql" target="_blank" rel="noopener">supabase-setup.sql</a>: ${tm('हे सगळे कॉपी करा, Supabase मध्ये SQL Editor उघडा, पेस्ट करा आणि Run दाबा. दोनदा चालवले तरी चालते.','Yeh poora copy karo, Supabase mein SQL Editor kholo, paste karo aur Run dabao. Do baar chalana bhi theek hai.','copy all of it, open the SQL Editor in Supabase, paste and press Run. Running it twice is fine.')}</p>`);
@@ -1072,7 +1078,7 @@ function confirmAsk(text,run){S.pending={type:'confirm',run};say(text,YN())}
 function linesOf(items){const out=[];for(const it of items){
     if(it.amt!=null&&it.qty==null&&it.p.sell>0){out.push({id:it.p.id,name:it.p.name,qty:r3(it.amt/it.p.sell),unit:it.p.unit,rate:it.p.sell,amount:it.amt,byAmount:true});continue}
     const q=toBase(it.qty,it.unit,it.p);
-  if(q==null){say(tm(`${it.p.name} ${UL[it.p.unit]} मध्ये विकले जाते. किती ${UL[it.p.unit]}?`,`${it.p.name} ${UL[it.p.unit]} mein bikta hai. Kitna ${UL[it.p.unit]}?`,`${it.p.name} is sold by the ${UL[it.p.unit]}. How many ${UL[it.p.unit]}?`));return null}
+  if(q==null){say(tm(`${dn(it.p)} ${UL[it.p.unit]} मध्ये विकले जाते. किती ${UL[it.p.unit]}?`,`${dn(it.p)} ${UL[it.p.unit]} mein bikta hai. Kitna ${UL[it.p.unit]}?`,`${dn(it.p)} is sold by the ${UL[it.p.unit]}. How many ${UL[it.p.unit]}?`));return null}
   out.push({id:it.p.id,name:it.p.name,qty:q,unit:it.p.unit,rate:it.p.sell,amount:Math.round(q*it.p.sell*100)/100})}return out}
 
 async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=Date.now();$('pend').innerHTML='';if(!text.startsWith('#')){S.ambText=null;S.ambIds=null}
@@ -1084,9 +1090,9 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
     return handle(o,true)}
   if(text.startsWith('#nm:')){const o=S.nameOffer,p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;const pickd=text==='#nm:all'?o.list:[o.list[+text.slice(4)]].filter(Boolean);
     const add=pickd.filter(n=>![p.name,...(p.names||[])].some(x=>key2(x)===key2(n)));if(!add.length)return;saveProduct({...p,names:[...(p.names||[]),...add]},'set',true);
-    return say(t(`${p.name} ke naam mein jud gaya: ${add.join(', ')}`,`Added to ${p.name}'s names: ${add.join(', ')}`))}
+    return say(t(`${dn(p)} ke naam mein jud gaya: ${add.join(', ')}`,`Added to ${dn(p)}'s names: ${add.join(', ')}`))}
   if(text==='#forcebill')return confirmBill(true);
-  if(text==='#alias'){const o=S.aliasOffer;S.aliasOffer=null;const p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;saveProduct({...p,names:[...(p.names||[]),o.nm]},'set',true);return say(t(`"${o.nm}" ab ${p.name} ka naam hai.`,`"${o.nm}" is now a name for ${p.name}.`))}
+  if(text==='#alias'){const o=S.aliasOffer;S.aliasOffer=null;const p=o&&S.products.find(x=>x.id===o.pid);if(!p)return;saveProduct({...p,names:[...(p.names||[]),o.nm]},'set',true);return say(t(`"${o.nm}" ab ${dn(p)} ka naam hai.`,`"${o.nm}" is now a name for ${dn(p)}.`))}
   if(text==='#bill'){if(S.quote){addToBill(S.quote);S.quote=null}return showTab('sales')}
   if(!fromAI)me(text);
   const toks=tokenize(text),has=s=>toks.some(x=>inS(s,x));
@@ -1114,15 +1120,15 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
     if(!items.length&&!R.amb&&mode!=='sales'&&S.lastP&&Date.now()-S.lastP.at<120000&&nums.length===1&&!toks.some(x=>x.unit)&&(ref||has(W.KAR)||has(W.RATE))&&!['STOCK','SELL','ADD','COST','KHATA','JAMA','KITNA'].some(n=>has(W[n]))){const lp=S.products.find(x=>x.id===S.lastP.id);if(lp){items.push({p:lp,qty:nums[0].num});follow=true}}
     if(items.length===1)S.lastP={id:items[0].p.id,at:Date.now()}}
   if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id)).filter(Boolean),same=ps.every(p=>key(p.name)===key(ps[0].name));S.ambText=text;S.ambIds=ps.map(p=>p.id);
-    const chips=ps.map(p=>[`${p.name} · ${fm(p.sell)} · ${fq(p.qty,p.unit)}`,'#pick:'+p.id]);if(same&&canDel())chips.push([t('Ek hi cheez hai, mila do','Same item, merge them'),'#merge',1]);
-    return say(same?t(`"${ps[0].name}" naam ke ${ps.length} product hain. Kaunsa?`,`There are ${ps.length} products named "${ps[0].name}". Which one?`):tm('कोणते?','Kaunsa?','Which one?'),chips)}
+    const chips=ps.map(p=>[`${dn(p)} · ${fm(p.sell)} · ${fq(p.qty,p.unit)}`,'#pick:'+p.id]);if(same&&canDel())chips.push([t('Ek hi cheez hai, mila do','Same item, merge them'),'#merge',1]);
+    return say(same?t(`"${dn(ps[0])}" naam ke ${ps.length} product hain. Kaunsa?`,`There are ${ps.length} products named "${dn(ps[0])}". Which one?`):tm('कोणते?','Kaunsa?','Which one?'),chips)}
   const left=toks.filter((x,i)=>!R.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','ALIAS','KAR','RATE','STOCK','SELL','KITNA'].some(n=>inS(W[n],x)));
   if(has(W.ALIAS)&&items.length===1&&left.length){const nm=left.map(x=>x.raw).join(' '),p=items[0].p;
-    return confirmAsk(tm(`"${nm}" हे ${p.name} चे नाव म्हणून सेव्ह करू का?`,`"${nm}" ko ${p.name} ka naam save karun?`,`Save "${nm}" as a name for ${p.name}?`),()=>{saveProduct({...p,names:[...(p.names||[]),nm]});say(tm('नाव जोडले.','Naam jud gaya.','Name added.'))})}
+    return confirmAsk(tm(`"${nm}" हे ${dn(p)} चे नाव म्हणून सेव्ह करू का?`,`"${nm}" ko ${dn(p)} ka naam save karun?`,`Save "${nm}" as a name for ${dn(p)}?`),()=>{saveProduct({...p,names:[...(p.names||[]),nm]});say(tm('नाव जोडले.','Naam jud gaya.','Name added.'))})}
   if(mode==='sales'&&!items.length){const k=w=>toks.some(x=>w.includes(x.k2));
     if(S.bill.length&&(k(['clear','khali'])||(has(W.REMOVE)&&k(['sab','sara','sare','pura','all','bill'])))){S.bill=[];S.forceAsk=0;renderBill();return say(t('Bill khali kar diya.','Bill cleared.'))}
     if(S.bill.length&&(has(W.YES)||has(W.PAKKA)))return confirmBill(S.forceAsk&&Date.now()-S.forceAsk<120000?true:undefined);
-    if((has(W.BILL)||k(['total']))&&!has(W.PAKKA))return say(S.bill.length?S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`:tm('बिल रिकामे आहे.','Bill khali hai.','The bill is empty.'))}
+    if((has(W.BILL)||k(['total']))&&!has(W.PAKKA))return say(S.bill.length?S.bill.map(l=>`${dn(l)} ${fq(l.qty,l.unit)} ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`:tm('बिल रिकामे आहे.','Bill khali hai.','The bill is empty.'))}
   if(mode==='sales'&&items.length&&has(W.LESS)&&S.bill.length){const ls=linesOf(items);if(!ls)return;const done=[];
     for(const l of ls){const e=S.bill.find(x=>x.id===l.id);if(!e)continue;e.qty=r3(e.qty-l.qty);e.amount=Math.round(e.qty*e.rate*100)/100;done.push(l.name)}
     S.bill=S.bill.filter(x=>x.qty>0);renderBill();return say(done.length?t(`${done.join(', ')} kam kiya. Total ${fm(billTotal())}`,`Reduced ${done.join(', ')}. Total ${fm(billTotal())}`):t('Yeh cheez bill mein nahi hai.','That item is not on the bill.'))}
@@ -1130,20 +1136,20 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
     const raw=linesOf(items);if(!raw)return;const lines=[];for(const l of raw){const e=lines.find(x=>x.id===l.id);if(e){e.qty=r3(e.qty+l.qty);e.amount=Math.round((e.amount+l.amount)*100)/100}else lines.push({...l})}
     addToBill(lines);return say(lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')+tm(' जोडले. ',' jud gaya. ',' added. ')+`Total ${fm(billTotal())}`)}
   if(has(W.ADD)||has(W.COST))return startAdd(toks,R,left);
-  if(has(W.REMOVE)&&items.length){S.bill=S.bill.filter(l=>!items.some(i=>i.p.id===l.id));renderBill();return say(t(items[0].p.name+' bill se hata diya.','Removed '+items[0].p.name+' from the bill.'))}
+  if(has(W.REMOVE)&&items.length){S.bill=S.bill.filter(l=>!items.some(i=>i.p.id===l.id));renderBill();return say(t(dn(items[0].p)+' bill se hata diya.','Removed '+dn(items[0].p)+' from the bill.'))}
   if(has(W.RATE)&&!items.length&&!toks.some(x=>x.num!==undefined))return say(t('Kis cheez ka rate? Aise bolo: "cheeni ka rate 46 kar do".','Price of what? Say: "change sugar price to 46".'));
   if(items.length===1&&(items[0].qty!=null||items[0].amt!=null)&&!items[0].unit&&!has(W.STOCK)&&!has(W.SELL)&&!has(W.KITNA)&&mode!=='sales'&&(has(W.RATE)||has(W.KAR)||follow)){const p=items[0].p,v=items[0].qty??items[0].amt;
     if(!(v>0))return say(t('Rate zero ya usse kam nahi ho sakta.','A price cannot be zero or less.'));
     const odd=p.sell>0&&(v>p.sell*3||v<p.sell/3)?t('Yeh bahut bada badlav hai. ','That is a very big change. '):'';
-    return confirmAsk(odd+tm(`${p.name} चा दर ${fm(p.sell)} वरून ${fm(v)} करू का?`,`${p.name} ka rate ${fm(p.sell)} se ${fm(v)} karun?`,`Change ${p.name} from ${fm(p.sell)} to ${fm(v)}?`),()=>{saveProduct({...p,sell:v,history:[...(p.history||[]),{from:p.sell,to:v,at:Date.now()}]});say(tm(`${p.name} आता ${fm(v)} प्रति ${UL[p.unit]}.`,`${p.name} ab ${fm(v)} per ${UL[p.unit]}.`,`${p.name} is now ${fm(v)} per ${UL[p.unit]}.`))})}
+    return confirmAsk(odd+tm(`${dn(p)} चा दर ${fm(p.sell)} वरून ${fm(v)} करू का?`,`${dn(p)} ka rate ${fm(p.sell)} se ${fm(v)} karun?`,`Change ${dn(p)} from ${fm(p.sell)} to ${fm(v)}?`),()=>{saveProduct({...p,sell:v,history:[...(p.history||[]),{from:p.sell,to:v,at:Date.now()}]});say(tm(`${dn(p)} आता ${fm(v)} प्रति ${UL[p.unit]}.`,`${dn(p)} ab ${fm(v)} per ${UL[p.unit]}.`,`${dn(p)} is now ${fm(v)} per ${UL[p.unit]}.`))})}
   if(has(W.SELL)&&items.length){const lines=linesOf(items);if(!lines)return;const tot=Math.round(lines.reduce((a,l)=>a+l.amount,0));
     const sh=short(lines),w=sh?tm(`लक्ष द्या: ${sh}. `,`Dhyan do: ${sh}. `,`Careful: ${sh}. `):'';
     return confirmAsk(w+tm(`${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} विकले, ${fm(tot)}. सेव्ह करू का?`,`${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} becha, ${fm(tot)}. Save karun?`,`Sold ${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} for ${fm(tot)}. Save it?`),()=>{const tt=recordSale(lines);say(tm('विक्री सेव्ह झाली, स्टॉक कमी केला.','Sale save ho gayi, stock kam kar diya.','Sale saved and stock lowered.'));showPay(tt)})}
   if(has(W.STOCK)&&items.length){const it=items[0],p=it.p;
-    if(it.qty!=null&&!has(W.KITNA)){const q=toBase(it.qty,it.unit,p);if(q!=null)return confirmAsk(tm(`${p.name} चा स्टॉक ${fq(q,p.unit)} करू का?`,`${p.name} ka stock ${fq(q,p.unit)} set karun?`,`Set ${p.name} stock to ${fq(q,p.unit)}?`),()=>{saveProduct({...p,qty:q});say(tm('स्टॉक दुरुस्त केला.','Stock theek kar diya.','Stock corrected.'))})}
-    return say(items.map(i=>`${i.p.name}: ${fq(i.p.qty,i.p.unit)} ${tm('शिल्लक आहे','bacha hai','left')}`).join('\n'))}
+    if(it.qty!=null&&!has(W.KITNA)){const q=toBase(it.qty,it.unit,p);if(q!=null)return confirmAsk(tm(`${dn(p)} चा स्टॉक ${fq(q,p.unit)} करू का?`,`${dn(p)} ka stock ${fq(q,p.unit)} set karun?`,`Set ${dn(p)} stock to ${fq(q,p.unit)}?`),()=>{saveProduct({...p,qty:q});say(tm('स्टॉक दुरुस्त केला.','Stock theek kar diya.','Stock corrected.'))})}
+    return say(items.map(i=>`${dn(i.p)}: ${fq(i.p.qty,i.p.unit)} ${tm('शिल्लक आहे','bacha hai','left')}`).join('\n'))}
   if(!items.length&&has(W.STOCK)&&(toks.length<=2||toks.some(x=>['sab','sabka','sara','sare','pura','poora','all','full','sagla'].includes(x.k2)))){const ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
-    return say(ps.length?ps.slice(0,40).map(p=>`${p.name}: ${fq(p.qty,p.unit)}`).join('\n')+(ps.length>40?t(`\n… aur ${ps.length-40}. Poori list Stock tab mein hai.`,`\n… and ${ps.length-40} more. The full list is in the Stock tab.`):''):t('Stock khali hai.','There is no stock yet.'),null,t(`${ps.length} cheezein hain, list screen par hai.`,`${ps.length} items, the list is on the screen.`))}
+    return say(ps.length?ps.slice(0,40).map(p=>`${dn(p)}: ${fq(p.qty,p.unit)}`).join('\n')+(ps.length>40?t(`\n… aur ${ps.length-40}. Poori list Stock tab mein hai.`,`\n… and ${ps.length-40} more. The full list is in the Stock tab.`):''):t('Stock khali hai.','There is no stock yet.'),null,t(`${ps.length} cheezein hain, list screen par hai.`,`${ps.length} items, the list is on the screen.`))}
   if(!items.length&&has(W.REMOVE))return say(t('Kya hatana hai? Aise bolo: "sugar hata do".','Remove what? Say: "remove sugar".'));
   if(!items.length&&has(W.STOCK))return say(t('Kis cheez ka stock? Aise bolo: "sugar ka stock 25 kilo hai" ya "10 litre milk aaya".','Stock of what? Say "set sugar stock to 25 kg" or "add 10 litre milk".'));
   if(!items.length){
@@ -1157,7 +1163,7 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
     if(!fromAI&&S.products.length){const line=await aiRewrite(text);if(line){const l=S.lang;await handle(line.replace(/^price\s+/i,''),true);S.lang=l;
         const R3=parseItems(tokenize(line)),unk=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k.length>=3&&!Object.values(W).some(w=>inS(w,x)));
         if(!S.pending&&R3.items.length===1&&unk.length>=1&&unk.length<=2){const p=R3.items[0].p,nm=unk.map(x=>x.raw).join(' ');S.aliasOffer={pid:p.id,nm};
-          say(t(`"${nm}" ko ${p.name} ka naam save karun? Agli baar turant samjhunga.`,`Save "${nm}" as a name for ${p.name}? Next time I will know it straight away.`),[[t('Haan, save karo','Yes, save it'),'#alias',1]])}
+          say(t(`"${nm}" ko ${dn(p)} ka naam save karun? Agli baar turant samjhunga.`,`Save "${nm}" as a name for ${dn(p)}? Next time I will know it straight away.`),[[t('Haan, save karo','Yes, save it'),'#alias',1]])}
         return}}
     {const unk=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep&&x.k2.length>=3&&!Object.values(W).some(w=>inS(w,x))),nm=unk.map(x=>x.raw).join(' ');
       /* A question about something the shop does not stock: say so, and offer to add it. */
@@ -1167,12 +1173,12 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
   const lines=linesOf(items);if(!lines)return;
   if(lines.length===1){const l=lines[0],one=items[0].qty==null&&!items[0].unit;S.quote=lines;
     /* "Zhadu hai?" asks whether it is in stock, so answer that as well as the price. */
-    if(one&&has(W.AVAIL)&&!has(W.RATE)&&(!has(W.KITNA)||!toks.some(x=>['ka','ki','ke','ko','kitila','mol'].includes(x.k2)))){const p=items[0].p;return say(p.qty>0?tm(`हो, ${p.name} आहे: ${fq(p.qty,p.unit)} शिल्लक, ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`Haan, ${p.name} hai: ${fq(p.qty,p.unit)} bacha, ${fm(p.sell)} per ${UL[p.unit]}.`,`Yes, ${p.name} is in stock: ${fq(p.qty,p.unit)} left, ${fm(p.sell)} per ${UL[p.unit]}.`)
-      :tm(`${p.name} संपले आहे. दर ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`${p.name} khatam ho gaya hai. Rate ${fm(p.sell)} per ${UL[p.unit]}.`,`${p.name} is out of stock. Price ${fm(p.sell)} per ${UL[p.unit]}.`))}
-    if(l.byAmount)return say(t(`${fm(l.amount)} mein ${fq(l.qty,l.unit)} ${l.name} (${fm(l.rate)} per ${UL[l.unit]})`,`${fm(l.amount)} buys ${fq(l.qty,l.unit)} of ${l.name} (${fm(l.rate)} per ${UL[l.unit]})`));
-    return say(one?`${l.name} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${l.name} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
+    if(one&&has(W.AVAIL)&&!has(W.RATE)&&(!has(W.KITNA)||!toks.some(x=>['ka','ki','ke','ko','kitila','mol'].includes(x.k2)))){const p=items[0].p;return say(p.qty>0?tm(`हो, ${dn(p)} आहे: ${fq(p.qty,p.unit)} शिल्लक, ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`Haan, ${dn(p)} hai: ${fq(p.qty,p.unit)} bacha, ${fm(p.sell)} per ${UL[p.unit]}.`,`Yes, ${dn(p)} is in stock: ${fq(p.qty,p.unit)} left, ${fm(p.sell)} per ${UL[p.unit]}.`)
+      :tm(`${dn(p)} संपले आहे. दर ${fm(p.sell)} प्रति ${UL[p.unit]}.`,`${dn(p)} khatam ho gaya hai. Rate ${fm(p.sell)} per ${UL[p.unit]}.`,`${dn(p)} is out of stock. Price ${fm(p.sell)} per ${UL[p.unit]}.`))}
+    if(l.byAmount)return say(t(`${fm(l.amount)} mein ${fq(l.qty,l.unit)} ${dn(l)} (${fm(l.rate)} per ${UL[l.unit]})`,`${fm(l.amount)} buys ${fq(l.qty,l.unit)} of ${dn(l)} (${fm(l.rate)} per ${UL[l.unit]})`));
+    return say(one?`${dn(l)} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${dn(l)} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
   S.quote=lines;
-  say(lines.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[tm('याचे बिल बनवा','Iska bill banao','Make this a bill'),'#bill',1]])}
+  say(lines.map(l=>`${dn(l)} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[tm('याचे बिल बनवा','Iska bill banao','Make this a bill'),'#bill',1]])}
 function addToBill(lines){S.forceAsk=0;$('payBox').innerHTML='';for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
 
 /* A product name said inside a sentence: drop the polite and filler words around it ("hey can you ... please"), keep everything in between. */
@@ -1191,7 +1197,7 @@ function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p
   S.pending=a;advanceAdd()}
 function advanceAdd(){const a=S.pending;
   if(!a.p&&!a.name){a.step='name';return say(tm('कोणती वस्तू?','Kaunsa product?','Which product?'))}
-  if(a.qty==null){a.step='qty';return say(a.p?tm(`${a.p.name} आधीच आहे, ${fm(a.p.sell)} प्रति ${UL[a.p.unit]}. किती आले?`,`${a.p.name} already hai, ${fm(a.p.sell)} per ${UL[a.p.unit]}. Kitna aaya?`,`${a.p.name} exists at ${fm(a.p.sell)} per ${UL[a.p.unit]}. How much came in?`):tm('किती आले? (उदा. 20 litre)','Kitna aaya? (jaise 20 litre)','How much? (e.g. 20 litre)'))}
+  if(a.qty==null){a.step='qty';return say(a.p?tm(`${dn(a.p)} आधीच आहे, ${fm(a.p.sell)} प्रति ${UL[a.p.unit]}. किती आले?`,`${dn(a.p)} already hai, ${fm(a.p.sell)} per ${UL[a.p.unit]}. Kitna aaya?`,`${dn(a.p)} exists at ${fm(a.p.sell)} per ${UL[a.p.unit]}. How much came in?`):tm('किती आले? (उदा. 20 litre)','Kitna aaya? (jaise 20 litre)','How much? (e.g. 20 litre)'))}
   if(!a.p&&!a.unit){a.step='unit';const g=guessUnitLocal(a.name);
     say(g?t(`${a.name} ${UL[g]} mein bikta hai na? Ya doosri unit chuno.`,`${a.name} is sold by the ${UL[g]}, right? Or pick another unit.`):t(`${a.name} kis unit mein bikta hai?`,`Which unit is ${a.name} sold in?`),unitChips(g));
     if(!g)guessUnit(a.name).then(u=>{if(u&&S.pending===a&&a.step==='unit')say(t(`Mera sujhav: ${UL[u]}.`,`My suggestion: ${UL[u]}.`),unitChips(u))}).catch(()=>{});return}
@@ -1229,25 +1235,25 @@ function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==
     case'exp':if(no)a.exp=null;else{const d=parseDate(text);if(!d){say(t('Date samajh nahi aayi. "14 Oct" jaise bolo, ya "nahi".','I could not read that date. Say it like "14 Oct", or "no".'));return true}a.exp=d}break;
     case'confirm':S.pending=null;if(!yes){say(tm('ठीक आहे, काही सेव्ह केले नाही.','Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}
       if(a.p){const p=S.products.find(x=>x.id===a.p.id)||a.p,n={...p,qty:Math.round((p.qty+a.q)*1000)/1000,sell:a.sell};n.addExp=a.exp||'';
-        if(a.sell!==p.sell)n.history=[...(p.history||[]),{from:p.sell,to:a.sell,at:Date.now()}];saveProduct(n,'restock');say(tm(`${p.name} आता ${fq(n.qty,n.unit)} आहे.`,`${p.name} ab ${fq(n.qty,n.unit)} hai.`,`${p.name} is now ${fq(n.qty,n.unit)}.`))}
+        if(a.sell!==p.sell)n.history=[...(p.history||[]),{from:p.sell,to:a.sell,at:Date.now()}];saveProduct(n,'restock');say(tm(`${dn(p)} आता ${fq(n.qty,n.unit)} आहे.`,`${dn(p)} ab ${fq(n.qty,n.unit)} hai.`,`${dn(p)} is now ${fq(n.qty,n.unit)}.`))}
       else{saveProduct({id:nid('p'),name:a.name,names:[],unit:a.u,qty:a.q,cost:a.cost,sell:a.sell,low:0,addExp:a.exp||''});say(t(`${a.name} jud gaya.`,`${a.name} added.`));offerNames(S.products[S.products.length-1])}
       return true}
   advanceAdd();return true}
 
 const billTotal=()=>Math.round(S.bill.reduce((a,l)=>a+l.amount,0));
-const short=lines=>lines.filter(l=>{const p=S.products.find(x=>x.id===l.id);return p&&l.qty>p.qty}).map(l=>{const p=S.products.find(x=>x.id===l.id);return tm(`${p.name} फक्त ${fq(p.qty,p.unit)} शिल्लक आहे`,`${p.name} sirf ${fq(p.qty,p.unit)} bacha hai`,`only ${fq(p.qty,p.unit)} of ${p.name} left`)}).join(', ');
+const short=lines=>lines.filter(l=>{const p=S.products.find(x=>x.id===l.id);return p&&l.qty>p.qty}).map(l=>{const p=S.products.find(x=>x.id===l.id);return tm(`${dn(p)} फक्त ${fq(p.qty,p.unit)} शिल्लक आहे`,`${dn(p)} sirf ${fq(p.qty,p.unit)} bacha hai`,`only ${fq(p.qty,p.unit)} of ${dn(p)} left`)}).join(', ');
 function confirmBill(force){if(!S.bill.length)return say(tm('बिल रिकामे आहे.','Bill khali hai.','The bill is empty.'));
   const sh=short(S.bill);if(sh&&force!==true){S.forceAsk=Date.now();return say(tm(`थांबा: ${sh}. तरीही विकायचे?`,`Ruko: ${sh}. Phir bhi bechna hai?`,`Wait: ${sh}. Sell anyway?`),[[tm('हो, विका','Haan, becho','Yes, sell'),'#forcebill',1],[tm('नाही','Nahi','No'),'nahi']])}
   S.forceAsk=0;
   const tot=recordSale(S.bill);S.bill=[];renderBill();say(tm(`बिल पक्के, एकूण ${fm(tot)}. स्टॉक कमी केला.`,`Bill pakka, total ${fm(tot)}. Stock kam kar diya.`,`Bill confirmed, total ${fm(tot)}. Stock lowered.`));showPay(tot);return tot}
 const daysTo=d=>Math.ceil((new Date(d)-Date.now())/864e5);
 function expiryList(){const l=[];S.products.forEach(p=>bOf(p).forEach(b=>{if(b.exp&&b.qty>0&&daysTo(b.exp)<=7)l.push([p,b])}));l.sort((x,y)=>bCmp(x[1],y[1]));
-  say(l.length?l.map(([p,b])=>`${p.name}: ${fq(b.qty,p.unit)} · ${daysTo(b.exp)<0?t('expire ho gaya','expired'):fmtD(b.exp)}`).join('\n'):tm('या आठवड्यात काही एक्सपायर होत नाही.','Is hafte kuch expire nahi ho raha.','Nothing expires this week.'))}
+  say(l.length?l.map(([p,b])=>`${dn(p)}: ${fq(b.qty,p.unit)} · ${daysTo(b.exp)<0?t('expire ho gaya','expired'):fmtD(b.exp)}`).join('\n'):tm('या आठवड्यात काही एक्सपायर होत नाही.','Is hafte kuch expire nahi ho raha.','Nothing expires this week.'))}
 
 /* ---------- rendering ---------- */
 function renderBill(){const b=$('bill'),bar=$('sellBar');b.hidden=!S.bill.length;bar.hidden=!S.bill.length;$('billEmpty').hidden=!!S.bill.length;renderQuick();if(!S.bill.length)return;
-  const txt=S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
-  b.innerHTML=`<table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}<small> ${fm(l.rate)}/${UL[l.unit]}</small></td><td class="n qtyc"><button type="button" data-step="-1" data-id="${esc(l.id)}" aria-label="Less ${esc(l.name)}">−</button><span>${fq(l.qty,l.unit)}</span><button type="button" data-step="1" data-id="${esc(l.id)}" aria-label="More ${esc(l.name)}">+</button></td><td class="n">${fm(l.amount)}</td><td><button type="button" class="rm" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody></table>`;
+  const txt=S.bill.map(l=>`${dn(l)} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
+  b.innerHTML=`<table><tbody>${S.bill.map(l=>`<tr><td>${esc(dn(l))}<small> ${fm(l.rate)}/${UL[l.unit]}</small></td><td class="n qtyc"><button type="button" data-step="-1" data-id="${esc(l.id)}" aria-label="Less ${esc(dn(l))}">−</button><span>${fq(l.qty,l.unit)}</span><button type="button" data-step="1" data-id="${esc(l.id)}" aria-label="More ${esc(dn(l))}">+</button></td><td class="n">${fm(l.amount)}</td><td><button type="button" class="rm" data-rm="${esc(l.id)}" aria-label="Remove ${esc(dn(l))}">×</button></td></tr>`).join('')}</tbody></table>`;
   bar.innerHTML=`<div><small>${tm('एकूण','Kul','Total')}</small><b>${fm(billTotal())}</b></div><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a><button class="btn" id="b-clear">${tm('रिकामे','Khali','Clear')}</button><button class="btn go" id="b-ok">${tm('पक्के करा','Pakka karo','Confirm')}</button>`;
   b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);S.forceAsk=0;renderBill()});
   /* + and − change a line by one piece or packet, or by 250 g / 250 ml for loose goods. */
@@ -1258,7 +1264,7 @@ function renderStock(){const cost=$('costOn').checked,all=[...S.products].sort((
   $('stockF').innerHTML=[['all',tm('सर्व','Sab','All'),all.length],['low',tm('कमी','Kam','Low'),low],['exp',tm('एक्सपायरी','Expiry','Expiring'),exp]].map(([k,l,n])=>`<button type="button" class="chip${f===k?' on':''}" data-f="${k}">${l} ${n}</button>`).join('');
   const ps=all.filter(p=>(f==='low'?isLow(p):f==='exp'?isExp(p):true)&&(!q||[p.name,...(p.names||[])].some(n=>key2(n).includes(q)||(key($('stockQ').value).length>=3&&key(n).includes(key($('stockQ').value))))));
   $('alerts').textContent=[low&&tm(`${low} वस्तू कमी आहेत`,`${low} cheezein kam hain`,`${low} low on stock`),exp&&tm(`${exp} लवकर एक्सपायर होणार`,`${exp} jaldi expire hongi`,`${exp} expiring within a week`)].filter(Boolean).join(' · ');$('reorderBtn').hidden=!lowItems().length;
-  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?`<span class="pill">${tm('कमी','Kam','Low')}</span>`:''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?tm('एक्सपायर झाले','Expire ho gaya','Expired'):tm('एक्सपायरी ','Expiry ','Expires ')+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
+  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(dn(p))}</b>${p.low&&p.qty<=p.low?`<span class="pill">${tm('कमी','Kam','Low')}</span>`:''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?tm('एक्सपायर झाले','Expire ho gaya','Expired'):tm('एक्सपायरी ','Expiry ','Expires ')+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
    <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?tm(' · खरेदी ',' · kharid ',' · cost ')+fm(p.cost):''}</span></button>`).join('')
    :all.length?`<p class="empty">${tm('काही सापडले नाही.','Kuch nahi mila.','Nothing matches.')}</p>`:`<p class="empty">${tm('अजून वस्तू नाहीत. "बोलून जोडा" दाबा, किंवा सांगा "साखर add करा".','Abhi koi product nahi hai. "Bolkar add karo" dabao, ya bolo "cheeni add karo".','No products yet. Tap "Add by voice", or tell the assistant "add sugar".')}</p>`}
 function renderSales(){if($('home'))setTimeout(()=>renderHome(),0);const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
@@ -1266,10 +1272,10 @@ function renderSales(){if($('home'))setTimeout(()=>renderHome(),0);const today=n
   $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):`<p class="empty">${tm('आज अजून विक्री नाही.','Aaj abhi koi bikri nahi hui.','No sales yet today.')}</p>`}
 function renderQuick(){const el=$('quick');if(!el)return;const since=Date.now()-30*864e5,sold={};S.sales.forEach(x=>{if(x.at>since)x.items.forEach(i=>sold[i.name]=(sold[i.name]||0)+1)});
   el.innerHTML='';[...S.products].sort((a,b)=>(sold[b.name]||0)-(sold[a.name]||0)||a.name.localeCompare(b.name)).forEach(p=>{const inb=S.bill.find(l=>l.id===p.id),b=document.createElement('button');b.type='button';b.className='qt'+(inb?' in':'');
-    b.innerHTML=`<b>${esc(p.name)}</b><small>${fm(p.sell)}/${UL[p.unit]}</small>${inb?`<i>${fq(inb.qty,p.unit).replace(/ (piece|packet)$/,'')}</i>`:''}`;
+    b.innerHTML=`<b>${esc(dn(p))}</b><small>${fm(p.sell)}/${UL[p.unit]}</small>${inb?`<i>${fq(inb.qty,p.unit).replace(/ (piece|packet)$/,'')}</i>`:''}`;
     b.onclick=()=>{addToBill([{id:p.id,name:p.name,qty:1,unit:p.unit,rate:p.sell,amount:p.sell}]);$('sellSay').textContent=''};el.append(b)})}
 const WHY={restock:['आले','Aaya','Restock'],sale:['विकले','Bika','Sale'],set:['दुरुस्ती','Sudhar','Correction'],create:['नवीन वस्तू','Naya product','New product']};
-const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(m.name)}</span><span class="p" style="font-weight:400">${tm(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+tm('आता','ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
+const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(dn(m))}</span><span class="p" style="font-weight:400">${tm(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+tm('आता','ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
 function renderMoves(){$('moveList').innerHTML=S.moves.length?S.moves.slice(0,60).map(moveRow).join(''):'<p class="empty">'+t('Abhi koi stock badlav nahi.','No stock changes yet.')+'</p>'}
 /* Four numbers a shopkeeper wants first. Tapping one asks the matching question. */
 function renderHome(){const el=$('home');if(!el)return;const sales=todaySales().reduce((a,x)=>a+x.total,0),owed=S.customers.reduce((a,c)=>a+Math.max(balance(c.id),0),0),low=lowItems().length;let exp=0;S.products.forEach(p=>bOf(p).forEach(b=>{if(b.exp&&b.qty>0&&daysTo(b.exp)<=7)exp++}));
@@ -1281,7 +1287,7 @@ function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';const lg=S.moves.filter(m=>m.pid===S.editing).slice(0,6);const bl=p.id?bOf(p).filter(b=>b.qty>0):[];$('f-log').innerHTML=(bl.length>1||bl.some(b=>b.exp)?'<b>'+t('Batch','Batches')+'</b>'+bl.map(b=>`<div class="item"><span>${fq(b.qty,p.unit)}</span><span class="p" style="font-weight:400">${b.exp?fmtD(b.exp):t('date nahi','no date')}</span></div>`).join(''):'')+(lg.length?'<b>'+t('Pichhle badlav','Recent changes')+'</b>'+lg.map(moveRow).join(''):'');$('f-name').focus()}
 $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.editing)||{},n=id=>parseFloat($(id).value)||0,sell=n('f-sell');
   if(!old.id){const nk=key2($('f-name').value),dup=S.products.find(x=>[x.name,...(x.names||[])].some(n=>key2(n)===nk));
-    if(dup){openEdit(dup);$('alerts').textContent=tm(`"${dup.name}" आधीच आहे. इथेच बदला.`,`"${dup.name}" pehle se hai. Isi ko yahan badlo.`,`"${dup.name}" already exists. Edit it here instead of adding it again.`);return}}
+    if(dup){openEdit(dup);$('alerts').textContent=tm(`"${dn(dup)}" आधीच आहे. इथेच बदला.`,`"${dn(dup)}" pehle se hai. Isi ko yahan badlo.`,`"${dn(dup)}" already exists. Edit it here instead of adding it again.`);return}}
   const p={...old,id:old.id||nid('p'),name:$('f-name').value.trim(),names:$('f-names').value.split(',').map(s=>s.trim()).filter(Boolean),unit:$('f-unit').value,qty:n('f-qty'),sell,low:n('f-low')};
   {const nx=$('f-exp').value,dq=r3(p.qty-(old.qty||0));delete p.expiry;
     if(!old.id||dq>0)p.addExp=nx;                       /* new stock takes the date typed */
