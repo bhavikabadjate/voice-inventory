@@ -1166,7 +1166,13 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
   say(lines.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[tm('याचे बिल बनवा','Iska bill banao','Make this a bill'),'#bill',1]])}
 function addToBill(lines){S.forceAsk=0;$('payBox').innerHTML='';for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
 
-function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p:null,name:it?null:left.map(x=>x.raw).join(' ')||null,qty:null,unit:null,cost:null,sell:null,exp:it&&!tracksExp(it.p)?null:undefined};
+/* A product name said inside a sentence: drop the polite and filler words around it ("hey can you ... please"), keep everything in between. */
+const FILL=new Set('hey hi hello ok okay please pls can could would will you u i we me my mujhe mujhko hume hamein humko want wanna need to a an the some new naya nayi nava ek one product item cheez saman maal in into stock store shop dukaan mein me ko bhi also and aur karo kar kardo karna do de dena dijiye hai chahiye zara jara bhai bhaiya yaar ji now abhi for of add jodo daalo daal dalo'.split(' '));
+function spokenName(ws){ws=ws.filter(Boolean);const all=ws.join(' ');const f=w=>FILL.has(w.toLowerCase().replace(/[^a-z]/g,''));
+  /* "daal"/"dal" is also a food: only treat it as filler when something else is left */
+  while(ws.length>1&&f(ws[0])&&!/^d+a+l$/i.test(ws[0]))ws.shift();while(ws.length>1&&f(ws[ws.length-1])&&!/^d+a+l$/i.test(ws[ws.length-1]))ws.pop();
+  const n=ws.join(' ').trim();return n&&!(ws.length===1&&f(n)&&!/^d+a+l$/i.test(n))?n.replace(/^\S/,m=>m.toUpperCase()):all.trim()&&!all.split(' ').every(f)?all:''}
+function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p:null,name:it?null:spokenName(left.map(x=>x.raw))||null,qty:null,unit:null,cost:null,sell:null,exp:it&&!tracksExp(it.p)?null:undefined};
   const nr=(i,set,d)=>[d,2*d].some(o=>toks[i+o]&&inS(set,toks[i+o]));
   const src=it||R.loose;let first=true;
   toks.forEach((x,i)=>{if(x.num===undefined)return;
