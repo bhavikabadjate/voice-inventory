@@ -119,6 +119,15 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
 .card p{margin:0;color:var(--muted);font-size:.9rem}
 .card input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);width:100%}
 .code{font:700 1.6rem var(--display);letter-spacing:.2em;color:var(--accent);user-select:all}
+.hist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 14px;flex:none}
+.hist summary{font:600 1rem var(--display);cursor:pointer}
+.hist .list{border:0;padding:0;max-height:38vh;flex:none;margin-top:6px}
+.sellArea{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.sellArea .empty{text-align:center;padding:28px 12px;margin:0;border:1.5px dashed var(--line);border-radius:16px}
+.sellSay{margin:0;font:600 1.1rem var(--display);text-align:center}
+.sellSay:empty{display:none}
+#quick .chip{color:var(--ink);font-weight:600;border-color:var(--accent)}
+.bill td button{border:0;background:none;color:var(--warn);font-size:1.1rem;padding:0 4px}
 </style>
 <div class="app">
   <header>
@@ -131,15 +140,14 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="talk" aria-selected="true">Ask</button>
     <button role="tab" data-tab="stock" aria-selected="false">Stock</button>
-    <button role="tab" data-tab="sales" aria-selected="false">Sales</button>
+    <button role="tab" data-tab="sales" aria-selected="false">Sell</button>
     <button role="tab" data-tab="shop" aria-selected="false" id="shopTab" hidden>Shop</button>
   </div>
 
   <section class="pane" id="pane-talk">
     <div class="thread" id="thread" aria-live="polite"></div>
-    <div class="bill" id="bill" hidden></div>
     <div class="tips" id="tips" aria-label="Try saying"></div>
-    <div class="panel">
+    <div class="panel" id="panel">
     <p class="hint" id="speakNote"></p>
     <div class="dock">
       <button class="mic" type="button" id="mic" aria-label="Tap and speak"><svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg></button>
@@ -169,8 +177,13 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
   </section>
 
   <section class="pane" id="pane-sales" hidden>
-    <h2 id="salesHead">Sales</h2>
-    <div class="list" id="salesList"></div>
+    <details class="hist"><summary id="salesHead">Today: ₹0</summary><div class="list" id="salesList"></div></details>
+    <div class="sellArea">
+      <div class="bill" id="bill" hidden></div>
+      <p class="empty" id="billEmpty">Bill khali hai. Mic dabao aur bolo: “2 kilo cheeni, 1 packet Parle-G”, ya neeche se item chuno.</p>
+      <p class="sellSay" id="sellSay" aria-live="polite"></p>
+    </div>
+    <div class="tips" id="quick" aria-label="Tap to add to the bill"></div>
   </section>
 
   <section class="pane" id="pane-shop" hidden>
@@ -333,6 +346,7 @@ const t=(hi,en)=>S.lang==='en'?en:hi;
 function say(text,chips,spoken){const d=document.createElement('div');d.className='msg bot';d.textContent=text;
   if(chips){const c=document.createElement('div');c.className='chips';chips.forEach(([label,send,go])=>{const b=document.createElement('button');b.type='button';b.className=go?'btn go':'chip';b.textContent=label;b.onclick=()=>handle(send);c.append(b)});d.append(c)}
   document.querySelectorAll('.msg.latest').forEach(x=>x.classList.remove('latest'));d.classList.add('latest');$('thread').append(d);$('thread').scrollTop=1e9;
+  $('sellSay').textContent=mode==='sales'?text:'';
   if($('speakOn').checked)speak(spoken||text)}
 let voices=[];
 function loadVoices(){try{voices=speechSynthesis.getVoices()||[]}catch(e){}}
@@ -355,7 +369,9 @@ function linesOf(items){const out=[];for(const it of items){const q=toBase(it.qt
   if(q==null){say(t(`${it.p.name} ${UL[it.p.unit]} mein bikta hai. Kitna ${UL[it.p.unit]}?`,`${it.p.name} is sold by the ${UL[it.p.unit]}. How many ${UL[it.p.unit]}?`));return null}
   out.push({id:it.p.id,name:it.p.name,qty:q,unit:it.p.unit,rate:it.p.sell,amount:Math.round(q*it.p.sell*100)/100})}return out}
 
-async function handle(text,fromAI){text=text.trim();if(!text)return;if(!fromAI)me(text);
+async function handle(text,fromAI){text=text.trim();if(!text)return;
+  if(text==='#bill'){if(S.quote){addToBill(S.quote);S.quote=null}return showTab('sales')}
+  if(!fromAI)me(text);
   const toks=tokenize(text),has=s=>toks.some(x=>inS(s,x));
   const words=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep);
   if(S.pending&&pendingStep(toks,text,has))return;
@@ -366,6 +382,9 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;if(!fromAI)m
   const left=toks.filter((x,i)=>!R.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','ALIAS','KAR','RATE','STOCK','SELL','KITNA'].some(n=>inS(W[n],x)));
   if(has(W.ALIAS)&&items.length===1&&left.length){const nm=left.map(x=>x.raw).join(' '),p=items[0].p;
     return confirmAsk(t(`"${nm}" ko ${p.name} ka naam save karun?`,`Save "${nm}" as a name for ${p.name}?`),()=>{saveProduct({...p,names:[...(p.names||[]),nm]});say(t('Naam jud gaya.','Name added.'))})}
+  if(mode==='sales'&&!items.length&&S.bill.length&&(has(W.YES)||has(W.PAKKA)))return confirmBill();
+  if(mode==='sales'&&items.length&&!['ADD','COST','STOCK','ALIAS','REMOVE','KITNA'].some(n=>has(W[n]))&&!(has(W.RATE)&&has(W.KAR))){
+    const lines=linesOf(items);if(!lines)return;addToBill(lines);return say(lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')+t(' jud gaya. ',' added. ')+`Total ${fm(billTotal())}`)}
   if(has(W.ADD)||has(W.COST))return startAdd(toks,R,left);
   if(has(W.REMOVE)&&items.length){S.bill=S.bill.filter(l=>!items.some(i=>i.p.id===l.id));renderBill();return say(t(items[0].p.name+' bill se hata diya.','Removed '+items[0].p.name+' from the bill.'))}
   if(has(W.RATE)&&has(W.KAR)&&items.length===1&&items[0].qty!=null){const p=items[0].p,v=items[0].qty;
@@ -381,11 +400,11 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;if(!fromAI)m
         const line=(r.text||'').trim().split('\n')[0];if(line&&!/^unknown/i.test(line)){const l=S.lang;await handle(line.replace(/^price\s+/i,''),true);S.lang=l;return}}catch(e){}}
     return say(t('Samajh nahi aaya. Aise bolo: "2 litre dudh kitne ka hai?", "cheeni add karo", "1 kilo sugar becha".','I did not catch that. Try: "price of 2 litre milk", "add sugar", "sold 1 kg sugar".'))}
   const lines=linesOf(items);if(!lines)return;
-  const append=toks[0].sep&&S.bill.length;
-  if(lines.length===1&&!append){const l=lines[0],one=items[0].qty==null&&!items[0].unit;
+  if(lines.length===1){const l=lines[0],one=items[0].qty==null&&!items[0].unit;S.quote=lines;
     return say(one?`${l.name} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${l.name} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
-  S.bill=append?[...S.bill,...lines]:lines;renderBill();
-  say(S.bill.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(billTotal())}`)}
+  S.quote=lines;
+  say(lines.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(Math.round(lines.reduce((a,l)=>a+l.amount,0)))}`,[[t('Iska bill banao','Make this a bill'),'#bill',1]])}
+function addToBill(lines){for(const l of lines){const e=S.bill.find(x=>x.id===l.id);if(e){e.qty=Math.round((e.qty+l.qty)*1000)/1000;e.amount=Math.round(e.qty*e.rate*100)/100}else S.bill.push({...l})}renderBill()}
 
 function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p:null,name:it?null:left.map(x=>x.raw).join(' ')||null,qty:null,unit:null,cost:null,sell:null,exp:it?null:undefined};
   const nr=(i,set,d)=>[d,2*d].some(o=>toks[i+o]&&inS(set,toks[i+o]));
@@ -432,12 +451,12 @@ function expiryList(){const l=S.products.filter(p=>p.expiry&&daysTo(p.expiry)<=7
   say(l.length?l.map(p=>`${p.name}: ${daysTo(p.expiry)<0?t('expire ho gaya','expired'):p.expiry}`).join('\n'):t('Is hafte kuch expire nahi ho raha.','Nothing expires this week.'))}
 
 /* ---------- rendering ---------- */
-function renderBill(){const b=$('bill');b.hidden=!S.bill.length;if(!S.bill.length)return;
+function renderBill(){const b=$('bill');b.hidden=!S.bill.length;$('billEmpty').hidden=!!S.bill.length;if(!S.bill.length)return;
   const txt=S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
-  b.innerHTML=`<h2>Bill</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td></tr>`).join('')}</tbody>
-  <tfoot><tr><td colspan="3">Total</td><td class="n">${fm(billTotal())}</td></tr></tfoot></table>
+  b.innerHTML=`<h2>Bill</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td><td><button type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="3">Total</td><td class="n">${fm(billTotal())}</td><td></td></tr></tfoot></table>
   <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">Confirm sale</button><button class="btn" id="b-clear">Clear</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`;
-  $('b-ok').onclick=confirmBill;$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
+  b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);renderBill()});$('b-ok').onclick=confirmBill;$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
 function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
   const low=ps.filter(p=>p.low&&p.qty<=p.low).length,exp=ps.filter(p=>p.expiry&&daysTo(p.expiry)<=7).length;
   $('alerts').textContent=[low&&low+' low on stock',exp&&exp+' expiring within a week'].filter(Boolean).join(' · ');
@@ -445,9 +464,11 @@ function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a
    <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?' · cost '+fm(p.cost):''}</span></button>`).join('')
    :'<p class="empty">No products yet. Tap Add product, or tell the assistant "cheeni add karo".</p>'}
 function renderSales(){const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
-  $('salesHead').textContent='Today: '+fm(tt);
-  $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):'<p class="empty">Sales appear here after you confirm a bill or say "2 litre dudh becha".</p>'}
-function renderAll(){renderStock();renderSales()}
+  $('salesHead').textContent=`Today's sales: ${fm(tt)}`;
+  $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):'<p class="empty">No sales yet today.</p>'}
+function renderQuick(){const el=$('quick');el.innerHTML='';[...S.products].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='+ '+p.name;
+  b.onclick=()=>{addToBill([{id:p.id,name:p.name,qty:1,unit:p.unit,rate:p.sell,amount:p.sell}]);$('sellSay').textContent=`${p.name} +1 ${UL[p.unit]}. Total ${fm(billTotal())}`};el.append(b)})}
+function renderAll(){renderStock();renderSales();renderQuick()}
 
 function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p;p=p||{};
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';$('f-name').focus()}
@@ -464,8 +485,12 @@ $('costOn').onchange=()=>{try{localStorage.setItem('cost',$('costOn').checked?1:
 $('speakOn').onchange=()=>{try{localStorage.setItem('speak',$('speakOn').checked?1:'')}catch(e){}
   if($('speakOn').checked)speak('Awaaz chalu hai');else{$('speakNote').textContent='';try{speechSynthesis.cancel()}catch(e){}}};
 try{$('costOn').checked=!!localStorage.getItem('cost');$('speakOn').checked=!!localStorage.getItem('speak')}catch(e){}
-document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
-  ['talk','stock','sales','shop'].forEach(n=>$('pane-'+n).hidden=n!==b.dataset.tab)});
+let mode='talk';
+/* Ask and Sell share one mic panel; it moves to whichever of the two tabs is open. */
+function showTab(name){document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===name));
+  ['talk','stock','sales','shop'].forEach(n=>$('pane-'+n).hidden=n!==name);
+  if(name==='talk'||name==='sales'){mode=name;$('pane-'+name).append($('panel'));setLang(S.lang,true)}}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 /* Mic button: uses the browser's speech recognition where the page is allowed the microphone; otherwise opens the keyboard so its mic key can be used. */
 let rec=null,listening=false;
 function micFallback(why){$('speakNote').textContent=why+' Tap the mic key on your keyboard instead, then Send.';$('say').focus()}
@@ -490,7 +515,8 @@ function greet(){say(t('Namaste! Kuch bhi pucho ya batao.','Hello! Ask or tell m
 /* The language switch sets what the mic listens for, the reply language and the voice. */
 function setLang(l,quiet){S.lang=l;try{localStorage.setItem('lang',l)}catch(e){}
   $('lang-hi').setAttribute('aria-pressed',l==='hi');$('lang-en').setAttribute('aria-pressed',l==='en');
-  $('micLabel').textContent=t('Tap karke bolo','Tap and speak');$('say').placeholder=t('Ya yahan likho: 2 litre dudh kitne ka hai?','Or type here: price of 2 litre milk');
+  $('micLabel').textContent=t('Tap karke bolo','Tap and speak');$('say').placeholder=mode==='sales'?t('Ya likho: 2 kilo cheeni, 1 Parle-G','Or type: 2 kg sugar, 1 Parle-G'):t('Ya yahan likho: 2 litre dudh kitne ka hai?','Or type here: price of 2 litre milk');
+  $('billEmpty').textContent=t('Bill khali hai. Mic dabao aur bolo: “2 kilo cheeni, 1 packet Parle-G”, ya neeche se item chuno.','The bill is empty. Tap the mic and say “2 kg sugar, 1 packet Parle-G”, or pick items below.');
   if(listening&&rec){try{rec.abort()}catch(e){}}if(!quiet)greet()}
 $('lang-hi').onclick=()=>setLang('hi');$('lang-en').onclick=()=>setLang('en');
 let L0='hi';try{L0=localStorage.getItem('lang')||'hi'}catch(e){}
