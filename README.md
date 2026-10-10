@@ -73,10 +73,26 @@ owner or staff member signs in.
 ## Cloud setup (Supabase, once)
 
 1. In the Supabase SQL editor, run `supabase/migrations/20261010000000_shop_sync.sql`.
+   Optionally also run `20261010020000_product_batches.sql`, which lets the web prototype sync
+   per-delivery expiry dates between phones.
 2. Authentication → Sign In / Providers: turn on **Anonymous sign-ins** (staff) and
    keep **Email** on (owner).
 3. Authentication → Emails: in the **Magic link** and **Confirm signup** templates, include `{{ .Token }}` so the
    email carries a 6-digit code.
+
+4. Optional, for the web prototype's Claude fallback: deploy the two functions that let Claude
+   interpret sentences the built-in rules miss (`understand`) answer business questions
+   from the shop's own numbers (`advise`), and do the smaller jobs (`assist`): reading a photo of a
+   khata page or a product pack, writing WhatsApp messages, the weekly summary, and unit and price checks.
+
+   ```bash
+   npx supabase functions deploy understand
+   npx supabase functions deploy advise
+   npx supabase functions deploy assist
+   npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   ```
+
+   Only signed-in shop members can call them. They run on Deno, so they are left out of `npm run typecheck`.
 
 The project URL and publishable key are in `src/config.ts` (or set
 `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`). Never put the
