@@ -128,6 +128,15 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
 .sellSay:empty{display:none}
 #quick .chip{color:var(--ink);font-weight:600;border-color:var(--accent)}
 .bill td button{border:0;background:none;color:var(--warn);font-size:1.1rem;padding:0 4px}
+html,body{overflow:hidden}
+.app{height:100dvh;max-height:100%}
+.thread{min-height:72px}
+@media (max-height:640px){
+  h1{font-size:1.35rem}.app{gap:6px;padding-block:8px}
+  .panel{padding:8px 10px;gap:6px}.dock{flex-direction:row;justify-content:center;gap:12px}
+  .mic{width:54px;height:54px;box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 16%,transparent)}.mic svg{width:26px;height:26px}.micLabel{margin:0}
+  .tabs button{padding:6px}.msg.bot.latest{font-size:1.15rem}
+}
 </style>
 <div class="app">
   <header>
@@ -262,7 +271,7 @@ function parseItems(toks){const idx=nameIndex(),items=[],used=new Set();let amb=
     for(n=3;n>=1&&!hit;n--){if(i+n>toks.length)continue;const sl=toks.slice(i,i+n),k=sl.map(x=>x.k).join(''),k2=sl.map(x=>x.k2).join('');
       const m=(idx.get(k)||[]).filter(e=>k.length>=3||e.k2===k2);if(m.length){hit=new Set(m.map(e=>e.id));break}}
     if(!hit&&t.k.length>=4&&!Object.values(W).some(s=>inS(s,t))){for(const [k,es] of idx)if(k.length>=4&&lev(k,t.k)<=1){hit=new Set(es.map(e=>e.id));n=1;break}}
-    if(hit){if(hit.size>1){amb=[...hit];}
+    if(hit){if(hit.size>1){if(S.prefer&&hit.has(S.prefer))hit=new Set([S.prefer]);else amb=[...hit]}
       if(cur.p)flush();cur.p=S.products.find(p=>p.id===[...hit][0]);for(let j=i;j<i+n;j++)used.add(j);i+=n-1}}
   flush();return{items,amb,used,loose:items.loose}}
 function toBase(q,u,p){if(q==null)q=1;if(!u)return q;const b=p.unit;
@@ -370,6 +379,12 @@ function linesOf(items){const out=[];for(const it of items){const q=toBase(it.qt
   out.push({id:it.p.id,name:it.p.name,qty:q,unit:it.p.unit,rate:it.p.sell,amount:Math.round(q*it.p.sell*100)/100})}return out}
 
 async function handle(text,fromAI){text=text.trim();if(!text)return;
+  if(text.startsWith('#pick:')||text==='#merge'){const o=S.ambText,ids=S.ambIds||[];S.ambText=S.ambIds=null;if(!o)return;
+    if(text==='#merge'){const ps=ids.map(id=>S.products.find(p=>p.id===id)).filter(Boolean);if(ps.length>1){const a=ps[0];let n={...a,names:[...(a.names||[])]},q=a.qty;
+        for(const b of ps.slice(1)){q+=b.qty;for(const nm of [b.name,...(b.names||[])])if(![n.name,...n.names].some(x=>key2(x)===key2(nm)))n.names.push(nm);deleteProduct(b.id)}
+        n.qty=Math.round(q*1000)/1000;saveProduct(n);say(t(`${a.name} ek kar diya, stock ${fq(n.qty,n.unit)}.`,`Merged into one ${a.name}, stock ${fq(n.qty,n.unit)}.`))}}
+    else S.prefer=text.slice(6);
+    try{await handle(o,true)}finally{S.prefer=null}return}
   if(text==='#bill'){if(S.quote){addToBill(S.quote);S.quote=null}return showTab('sales')}
   if(!fromAI)me(text);
   const toks=tokenize(text),has=s=>toks.some(x=>inS(s,x));
@@ -378,7 +393,9 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;
   if(has(W.BILL)&&has(W.PAKKA))return confirmBill();
   if(has(W.EXPIRE))return expiryList();
   const R=parseItems(toks),items=R.items;
-  if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id));return say(t('Kaunsa?','Which one?'),ps.map(p=>[p.name,text+' '+p.name]))}
+  if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id)).filter(Boolean),same=ps.every(p=>key(p.name)===key(ps[0].name));S.ambText=text;S.ambIds=ps.map(p=>p.id);
+    const chips=ps.map(p=>[`${p.name} · ${fm(p.sell)} · ${fq(p.qty,p.unit)}`,'#pick:'+p.id]);if(same)chips.push([t('Ek hi cheez hai, mila do','Same item, merge them'),'#merge',1]);
+    return say(same?t(`"${ps[0].name}" naam ke ${ps.length} product hain. Kaunsa?`,`There are ${ps.length} products named "${ps[0].name}". Which one?`):t('Kaunsa?','Which one?'),chips)}
   const left=toks.filter((x,i)=>!R.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','ALIAS','KAR','RATE','STOCK','SELL','KITNA'].some(n=>inS(W[n],x)));
   if(has(W.ALIAS)&&items.length===1&&left.length){const nm=left.map(x=>x.raw).join(' '),p=items[0].p;
     return confirmAsk(t(`"${nm}" ko ${p.name} ka naam save karun?`,`Save "${nm}" as a name for ${p.name}?`),()=>{saveProduct({...p,names:[...(p.names||[]),nm]});say(t('Naam jud gaya.','Name added.'))})}
@@ -473,6 +490,8 @@ function renderAll(){renderStock();renderSales();renderQuick()}
 function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p;p=p||{};
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';$('f-name').focus()}
 $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.editing)||{},n=id=>parseFloat($(id).value)||0,sell=n('f-sell');
+  if(!old.id){const nk=key2($('f-name').value),dup=S.products.find(x=>[x.name,...(x.names||[])].some(n=>key2(n)===nk));
+    if(dup){openEdit(dup);$('alerts').textContent=`"${dup.name}" already exists. Edit it here instead of adding it again.`;return}}
   const p={...old,id:old.id||nid('p'),name:$('f-name').value.trim(),names:$('f-names').value.split(',').map(s=>s.trim()).filter(Boolean),unit:$('f-unit').value,qty:n('f-qty'),sell,low:n('f-low'),expiry:$('f-exp').value};
   if($('costOn').checked)p.cost=n('f-cost');else if(p.cost===undefined)p.cost=null;
   if(old.id&&old.sell!==sell)p.history=[...(old.history||[]),{from:old.sell,to:sell,at:Date.now()}];
