@@ -78,6 +78,16 @@ owner or staff member signs in.
 3. Authentication → Emails: in the **Magic link** and **Confirm signup** templates, include `{{ .Token }}` so the
    email carries a 6-digit code.
 
+4. Optional, for the web prototype's Claude fallback: deploy the function that lets Claude
+   interpret sentences the built-in rules miss.
+
+   ```bash
+   npx supabase functions deploy understand
+   npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   ```
+
+   Only signed-in shop members can call it. It runs on Deno, so it is left out of `npm run typecheck`.
+
 The project URL and publishable key are in `src/config.ts` (or set
 `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`). Never put the
 service_role key in the app.
