@@ -4,12 +4,13 @@
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AccountSection } from '@/components/account-section';
+import { notify } from '@/components/notify';
 import { Button, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
 import { alertCount, findAlerts } from '@/core/alerts';
 import { emptyShop, type Shop } from '@/core/bill-document';
 import { unitLabel } from '@/core/units';
@@ -35,13 +36,13 @@ export default function ShopScreen() {
   const alerts = findAlerts(products, new Date());
   const save = async () => {
     if (shop.upiId && !/^[\w.-]+@[\w.-]+$/.test(shop.upiId.trim())) {
-      return Alert.alert('UPI ID should look like name@okaxis');
+      return notify('UPI ID should look like name@okaxis');
     }
     try {
       await updateShop(db, shop);
-      Alert.alert('Saved');
+      notify('Saved');
     } catch {
-      Alert.alert('Saved on this phone', 'It will reach staff phones at the next sync.');
+      notify('Saved on this phone', 'It will reach staff phones at the next sync.');
     }
   };
 
@@ -102,7 +103,7 @@ export default function ShopScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth },
+  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
   content: { padding: Spacing.four, paddingBottom: BottomTabInset + Spacing.four, gap: Spacing.three },
   title: { fontSize: 20, fontWeight: '700', marginTop: Spacing.two },
   row: { flexDirection: 'row' },

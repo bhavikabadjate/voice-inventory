@@ -9,11 +9,11 @@ import * as Speech from 'expo-speech';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Accent, Button, Chip, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
 import { alertCount, findAlerts } from '@/core/alerts';
 import { formatRupees } from '@/core/billing';
 import {
@@ -47,6 +47,9 @@ const YES_NO: Record<Lang, [string, string]> = {
   mr: ['हो', 'नाही'],
   en: ['Yes', 'No'],
 };
+
+// In a browser the bill is printed or saved as a PDF instead of shared.
+const PRINT: Record<Lang, string> = { hi: 'बिल प्रिंट करें', mr: 'बिल प्रिंट करा', en: 'Print bill' };
 
 const LABELS: Record<Lang, { confirmSale: string; share: string; today: string; total: string; attention: (n: number) => string }> = {
   hi: {
@@ -255,7 +258,11 @@ export default function AskScreen() {
                 />
               ) : null}
               {bill && !awaitingYesNo(convo) ? (
-                <Button title={LABELS[replyLang].share} kind="secondary" onPress={sendBill} />
+                <Button
+                  title={Platform.OS === 'web' ? PRINT[replyLang] : LABELS[replyLang].share}
+                  kind="secondary"
+                  onPress={sendBill}
+                />
               ) : null}
             </View>
           ) : null}
@@ -285,7 +292,7 @@ export default function AskScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth },
+  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
   content: {
     padding: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,

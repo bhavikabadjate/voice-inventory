@@ -52,6 +52,24 @@ npx expo run:android   # or: npx expo run:ios (macOS with Xcode)
 
 Or build in the cloud with EAS: `npx eas-cli@latest login`, then `npx eas-cli@latest build --profile preview --platform android` gives an APK to install on any Android phone.
 
+### In a browser
+
+The same app runs on the web:
+
+```bash
+npx expo start --web                 # try it locally
+npx expo export --platform web       # build the site into dist/
+npx eas-cli@latest deploy --prod     # put it online with EAS Hosting
+```
+
+The local database needs two response headers, `Cross-Origin-Embedder-Policy: credentialless`
+and `Cross-Origin-Opener-Policy: same-origin`. The dev server and EAS Hosting take them from
+`app.json`; any other host has to send them itself.
+
+On the web, voice input works in Chrome and Edge, a bill opens the print dialog (print it or
+save as PDF) instead of sharing, and the shop's data lives in that browser and syncs once the
+owner or staff member signs in.
+
 ## Cloud setup (Supabase, once)
 
 1. In the Supabase SQL editor, run `supabase/migrations/20261010000000_shop_sync.sql`.

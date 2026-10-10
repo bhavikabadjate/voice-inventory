@@ -4,11 +4,12 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState, type ReactNode } from 'react';
-import { Alert, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { notify } from '@/components/notify';
 import { Button, Chip, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
 import { formatRupees } from '@/core/billing';
 import { findCustomers, owing, reminderLink, whatsappNumber, type Customer, type KhataEntry } from '@/core/khata';
 import type { Lang } from '@/core/units';
@@ -134,8 +135,8 @@ function CustomerForm({
   const [name, setName] = useState(initial?.name ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const save = () => {
-    if (!name.trim()) return Alert.alert('Add the customer’s name');
-    if (phone.trim() && !whatsappNumber(phone)) return Alert.alert('Phone should be a 10-digit mobile number');
+    if (!name.trim()) return notify('Add the customer’s name');
+    if (phone.trim() && !whatsappNumber(phone)) return notify('Phone should be a 10-digit mobile number');
     onSave(name, phone);
   };
   return (
@@ -179,7 +180,7 @@ function CustomerKhata({
 
   const write = async (sign: 1 | -1) => {
     const paise = toPaise(amount);
-    if (!paise) return Alert.alert('Enter an amount');
+    if (!paise) return notify('Enter an amount');
     await addKhataEntry(db, customer.id, sign * paise, note.trim());
     setAmount('');
     setNote('');
@@ -189,8 +190,8 @@ function CustomerKhata({
 
   const remind = async () => {
     const link = reminderLink(await getShop(db), customer, lang);
-    if (!link) return Alert.alert('Add a mobile number for this customer first');
-    Linking.openURL(link).catch(() => Alert.alert('Could not open WhatsApp'));
+    if (!link) return notify('Add a mobile number for this customer first');
+    Linking.openURL(link).catch(() => notify('Could not open WhatsApp'));
   };
 
   if (editing) {
@@ -273,7 +274,7 @@ function CustomerKhata({
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth },
+  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
   header: { padding: Spacing.three, gap: Spacing.three },
   detailHeader: { gap: Spacing.three, paddingTop: Spacing.three, paddingBottom: Spacing.two },
   topRow: { flexDirection: 'row', justifyContent: 'space-between' },

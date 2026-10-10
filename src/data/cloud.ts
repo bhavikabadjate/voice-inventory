@@ -6,13 +6,13 @@ import 'react-native-url-polyfill/auto';
 
 import { createClient } from '@supabase/supabase-js';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import Storage from 'expo-sqlite/kv-store';
 import { AppState } from 'react-native';
 
 import { SUPABASE_KEY, SUPABASE_URL } from '@/config';
 import type { Shop } from '@/core/bill-document';
 import { syncOnce, type Membership, type Remote, type RemoteShop, type Table } from '@/core/sync';
 
+import { authStorage } from './auth-storage';
 import {
   emitDataChanged,
   getAccount,
@@ -27,7 +27,7 @@ import {
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
-    storage: Storage,
+    storage: authStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
