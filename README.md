@@ -73,6 +73,8 @@ owner or staff member signs in.
 ## Cloud setup (Supabase, once)
 
 1. In the Supabase SQL editor, run `supabase/migrations/20261010000000_shop_sync.sql`.
+   Optionally also run `20261010020000_product_batches.sql`, which lets the web prototype sync
+   per-delivery expiry dates between phones.
 2. Authentication → Sign In / Providers: turn on **Anonymous sign-ins** (staff) and
    keep **Email** on (owner).
 3. Authentication → Emails: in the **Magic link** and **Confirm signup** templates, include `{{ .Token }}` so the
