@@ -45,7 +45,7 @@ npm install
 npx expo run:android   # or: npx expo run:ios (macOS with Xcode)
 ```
 
-Or build in the cloud with EAS: `npx eas-cli@latest build --profile development`.
+Or build in the cloud with EAS: `npx eas-cli@latest login`, then `npx eas-cli@latest build --profile preview --platform android` gives an APK to install on any Android phone.
 
 ## Cloud setup (Supabase, once)
 
