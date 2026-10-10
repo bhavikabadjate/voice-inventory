@@ -11,7 +11,7 @@ await pg.click('[data-tab=stock]');await over('stock');
 await pg.click('#newBtn');await pg.fill('#f-name','<img src=x onerror=window.__x=1> Very Long Product Name That Goes On And On For Testing Layout');await pg.fill('#f-sell','25');await pg.fill('#f-qty','3');await pg.click('#edit button[type=submit]');
 ok('html in a name is shown as text, not run',await ev(()=>!window.__x&&[...document.querySelectorAll('#stockList b')].some(x=>x.textContent.includes('<img'))));await over('stock with a very long name');
 await pg.click('#newBtn');await pg.fill('#f-name','Milk');await pg.fill('#f-sell','60');await pg.click('#edit button[type=submit]');
-ok('adding an existing name opens the existing product',await ev(()=>S.products.filter(p=>p.name==='Milk').length===1&&/already exists/.test(document.getElementById('alerts').textContent)),await ev(()=>document.getElementById('alerts').textContent));
+ok('adding an existing name opens the existing product',await ev(()=>S.products.filter(p=>p.name==='Milk').length===1&&/already exists|pehle se hai/.test(document.getElementById('alerts').textContent)),await ev(()=>document.getElementById('alerts').textContent));
 await pg.click('#f-cancel');
 await pg.click('#newBtn');await pg.fill('#f-name','Negative Test');await pg.fill('#f-sell','-5').catch(()=>{});await pg.fill('#f-qty','-3').catch(()=>{});await pg.click('#edit button[type=submit]');
 ok('negative price or quantity is not saved',await ev(()=>!S.products.some(p=>p.sell<0||p.qty<0)),await ev(()=>S.products.filter(p=>p.sell<0||p.qty<0)));
@@ -30,7 +30,7 @@ await pg.fill('#p-cust','Test Customer');await pg.click('#p-khata');ok('bill mov
 // --- khata
 await pg.click('[data-tab=khata]');await over('khata');await pg.click('#k-form button[type=submit]');ok('empty khata form is refused',await ev(()=>S.khata.length===1&&/dono|both/.test(document.getElementById('k-msg').textContent)));
 await pg.fill('#k-name','Asha');await pg.fill('#k-amt','100');await pg.fill('#k-phone','12345');await pg.click('#k-form button[type=submit]');ok('bad phone is refused',await ev(()=>!S.customers.some(c=>c.name==='Asha')));
-await pg.fill('#k-phone','9876543210');await pg.click('#k-form button[type=submit]');ok('good phone is saved with +91',await ev(()=>(S.customers.find(c=>c.name==='Asha')||{}).phone==='919876543210'));
+await pg.fill('#k-phone','9123456780');await pg.click('#k-form button[type=submit]');ok('good phone is saved with +91',await ev(()=>(S.customers.find(c=>c.name==='Asha')||{}).phone==='919123456780'));
 await pg.fill('#k-name','Asha');await pg.fill('#k-amt','150');await pg.click('#k-paid');ok('paying more than owed shows an advance, not a negative debt',await ev(()=>/advance|jama/.test(document.getElementById('khataList').textContent)),await ev(()=>document.getElementById('khataList').textContent.slice(0,120)));
 // --- shop
 await pg.click('[data-tab=shop]');await over('shop');await pg.fill('#i-name','Test Kirana');await pg.fill('#i-upi','not a upi');await pg.click('#i-form button[type=submit]');ok('bad UPI ID is refused',await ev(()=>!S.shop.upi));

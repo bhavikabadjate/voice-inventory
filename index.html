@@ -399,11 +399,11 @@ async function sync(){await flush();
   await pull()}
 async function loadTeam(){const el=$('teamBox');if(!el||!store||member.role!=='owner')return;
   try{const staff=ck(await sb.from('members').select('user_id,role,name,can_see_cost,can_delete').eq('store_id',store.id)).filter(m=>m.role==='staff');el.hidden=false;
-    el.innerHTML='<h2>Staff</h2>'+(staff.length?'<p>Choose what each person can do. Changes reach their phone within about 20 seconds.</p>'+staff.map(m=>`<div class="mrow"><b>${esc(m.name||'Staff')}</b><span class="row"><label class="tog"><input type="checkbox" data-u="${esc(m.user_id)}" data-f="can_see_cost" ${m.can_see_cost?'checked':''}> Sees cost and profit</label><label class="tog"><input type="checkbox" data-u="${esc(m.user_id)}" data-f="can_delete" ${m.can_delete?'checked':''}> Can delete products</label><button type="button" class="chip" data-rm="${esc(m.user_id)}" style="color:var(--warn)">Remove</button></span></div>`).join(''):'<p>No staff have joined yet. Share the shop code above.</p>');
+    el.innerHTML='<h2>Staff</h2>'+(staff.length?`<p>${t('Har vyakti kya kar sakta hai, yeh chuno. Badlav unke phone par lagbhag 20 second mein pahunchta hai.','Choose what each person can do. Changes reach their phone within about 20 seconds.')}</p>`+staff.map(m=>`<div class="mrow"><b>${esc(m.name||'Staff')}</b><span class="row"><label class="tog"><input type="checkbox" data-u="${esc(m.user_id)}" data-f="can_see_cost" ${m.can_see_cost?'checked':''}> ${t('Kharid aur munafa dekh sakta hai','Sees cost and profit')}</label><label class="tog"><input type="checkbox" data-u="${esc(m.user_id)}" data-f="can_delete" ${m.can_delete?'checked':''}> ${t('Product hata sakta hai','Can delete products')}</label><button type="button" class="chip" data-rm="${esc(m.user_id)}" style="color:var(--warn)">${t('Hatao','Remove')}</button></span></div>`).join(''):`<p>${t('Abhi koi staff nahi juda. Upar ka code unhe do.','No staff have joined yet. Share the shop code above.')}</p>`);
     el.onchange=async e=>{const i=e.target;if(!i.dataset.f)return;try{ck(await sb.from('members').update({[i.dataset.f]:i.checked}).eq('store_id',store.id).eq('user_id',i.dataset.u))}catch(x){i.checked=!i.checked;$('shopMsg').textContent='Could not change that: '+(x.message||x)}};
-    el.onclick=async e=>{const b=e.target.closest('[data-rm]');if(!b)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent='Tap again to remove';return}
+    el.onclick=async e=>{const b=e.target.closest('[data-rm]');if(!b)return;if(!b.dataset.sure){b.dataset.sure=1;b.textContent=t('Hatane ke liye dobara dabao','Tap again to remove');return}
       try{ck(await sb.from('members').delete().eq('store_id',store.id).eq('user_id',b.dataset.rm));loadTeam()}catch(x){$('shopMsg').textContent='Could not remove: '+(x.message||x)}}}
-  catch(e){el.hidden=false;el.innerHTML='<h2>Staff</h2><p>Could not load the staff list. Check the internet and open this tab again.</p>'}}
+  catch(e){el.hidden=false;el.innerHTML=`<h2>Staff</h2><p>${t('Staff ki list nahi khuli. Internet dekho aur yeh tab dobara kholo.','Could not load the staff list. Check the internet and open this tab again.')}</p>`}}
 function cloudSave(p,old,reason){const sid=store.id;
   const unit=(p.runit&&!R2U[p.runit]&&p.unit==='pc')?p.runit:U2R[p.unit];
   {const row={id:p.id,store_id:sid,names:[p.name,...(p.names||[])],unit,sell_paise:Math.round(p.sell*100),expiry:p.expiry||null,low_stock_at:p.low||null,deleted:false};if(S.hasBatchCol)row.batches=p.batches;outbox({t:'product',row})}
@@ -436,25 +436,25 @@ async function cloudInit(){await loadScript('supabase.js');
   setInterval(()=>{if(store&&document.visibilityState==='visible'&&!S.pending&&$('edit').hidden)enqueue(sync)},20000);
   window.addEventListener('online',()=>enqueue(sync))}
 function renderShop(){const b=$('shopBox');
-  if(!sb){b.innerHTML='<div class="card"><h2>Shop account</h2><p>Connecting to the cloud…</p></div>';return}
-  if(store){b.innerHTML=`<div class="card"><h2>${esc(store.name||'Shop')}</h2><p>You are signed in as ${member.role==='owner'?'the owner':'staff'}${member.name?' ('+esc(member.name)+')':''}. Stock and sales sync with every phone of this shop.</p>
-    ${member.role==='owner'?`<p>Staff join with this shop code:</p><div class="code">${esc(store.code)}</div>`:''}
-    <div class="row"><button class="btn go" id="c-sync">Sync now</button><button class="btn" id="c-out">Sign out</button></div></div><div class="card" id="teamBox" hidden></div>`;loadTeam();
+  if(!sb){b.innerHTML=`<div class="card"><h2>${t('Dukaan ka account','Shop account')}</h2><p>${t('Cloud se jud raha hai…','Connecting to the cloud…')}</p></div>`;return}
+  if(store){b.innerHTML=`<div class="card"><h2>${esc(store.name||'Shop')}</h2><p>${t(`Aap ${member.role==='owner'?'maalik':'staff'} ke roop mein sign in hain`,`You are signed in as ${member.role==='owner'?'the owner':'staff'}`)}${member.name?' ('+esc(member.name)+')':''}. ${t('Stock aur bikri is dukaan ke har phone par sync hoti hai.','Stock and sales sync with every phone of this shop.')}</p>
+    ${member.role==='owner'?`<p>${t('Staff is code se judta hai:','Staff join with this shop code:')}</p><div class="code">${esc(store.code)}</div>`:''}
+    <div class="row"><button class="btn go" id="c-sync">${t('Abhi sync karo','Sync now')}</button><button class="btn" id="c-out">${t('Sign out','Sign out')}</button></div></div><div class="card" id="teamBox" hidden></div>`;loadTeam();
     $('c-sync').onclick=()=>act(()=>enqueue(sync));$('c-out').onclick=()=>act(async()=>{await sb.auth.signOut();location.reload()});return}
-  if(session){b.innerHTML=`<div class="card"><h2>Create your shop</h2><p>You are signed in but have no shop yet. The ${S.products.length} products on this device will be uploaded to it.</p>
-    <input id="n-shop" placeholder="Shop name" autocomplete="organization"><input id="n-owner" placeholder="Your name" autocomplete="name">
-    <div class="row"><button class="btn go" id="c-create">Create shop</button><button class="btn" id="c-out">Sign out</button></div></div>`+staffCard();
+  if(session){b.innerHTML=`<div class="card"><h2>${t('Apni dukaan banao','Create your shop')}</h2><p>${t(`Aap sign in hain par abhi dukaan nahi bani. Is phone ke ${S.products.length} product usmein chale jayenge.`,`You are signed in but have no shop yet. The ${S.products.length} products on this device will be uploaded to it.`)}</p>
+    <input id="n-shop" placeholder="${t('Dukaan ka naam','Shop name')}" autocomplete="organization"><input id="n-owner" placeholder="${t('Aapka naam','Your name')}" autocomplete="name">
+    <div class="row"><button class="btn go" id="c-create">${t('Dukaan banao','Create shop')}</button><button class="btn" id="c-out">Sign out</button></div></div>`+staffCard();
     $('c-create').onclick=()=>act(createShop);$('c-out').onclick=()=>act(async()=>{await sb.auth.signOut();location.reload()});wireStaff();return}
-  b.innerHTML=`<div class="card"><h2>Owner sign-in</h2><p>We email you a 6-digit code. Your shop then syncs across phones and is backed up.</p>
-    ${otpEmail?`<p>Code sent to ${esc(otpEmail)}.</p><input id="o-code" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code"><div class="row"><button class="btn go" id="c-verify">Verify</button><button class="btn" id="c-back">Change email</button></div>`
-      :`<input id="o-email" type="email" placeholder="Email address" autocomplete="email"><div class="row"><button class="btn go" id="c-send">Send code</button></div>`}</div>`+staffCard();
+  b.innerHTML=`<div class="card"><h2>${t('Maalik ka sign-in','Owner sign-in')}</h2><p>${t('Hum aapko email par 6 ank ka code bhejte hain. Phir dukaan sab phone par sync hoti hai aur backup rehta hai.','We email you a 6-digit code. Your shop then syncs across phones and is backed up.')}</p>
+    ${otpEmail?`<p>${t('Code bheja gaya:','Code sent to')} ${esc(otpEmail)}.</p><input id="o-code" inputmode="numeric" placeholder="${t('6 ank ka code','6-digit code')}" autocomplete="one-time-code"><div class="row"><button class="btn go" id="c-verify">${t('Jaancho','Verify')}</button><button class="btn" id="c-back">${t('Email badlo','Change email')}</button></div>`
+      :`<input id="o-email" type="email" placeholder="${t('Email','Email address')}" autocomplete="email"><div class="row"><button class="btn go" id="c-send">${t('Code bhejo','Send code')}</button></div>`}</div>`+staffCard();
   if(otpEmail){$('c-verify').onclick=()=>act(async()=>{ck(await sb.auth.verifyOtp({email:otpEmail,token:$('o-code').value.trim(),type:'email'}));otpEmail='';await findStore()});$('c-back').onclick=()=>{otpEmail='';renderShop()}}
-  else $('c-send').onclick=()=>act(async()=>{const e=$('o-email').value.trim();if(!e)throw new Error('Enter your email address');ck(await sb.auth.signInWithOtp({email:e,options:{shouldCreateUser:true}}));otpEmail=e});
+  else $('c-send').onclick=()=>act(async()=>{const e=$('o-email').value.trim();if(!e)throw new Error(t('Apna email likho','Enter your email address'));ck(await sb.auth.signInWithOtp({email:e,options:{shouldCreateUser:true}}));otpEmail=e});
   wireStaff()}
-const staffCard=()=>`<div class="card"><h2>Join as staff</h2><p>Ask the owner for the shop's 6-digit code.</p><input id="s-code" inputmode="numeric" placeholder="Shop code"><input id="s-name" placeholder="Your name" autocomplete="name"><div class="row"><button class="btn go" id="c-join">Join shop</button></div></div>`;
-function wireStaff(){$('c-join').onclick=()=>act(async()=>{const code=$('s-code').value.trim(),name=$('s-name').value.trim();if(!code||!name)throw new Error('Enter the shop code and your name');
+const staffCard=()=>`<div class="card"><h2>${t('Staff ban kar judo','Join as staff')}</h2><p>${t('Maalik se dukaan ka 6 ank ka code lo.',"Ask the owner for the shop's 6-digit code.")}</p><input id="s-code" inputmode="numeric" placeholder="${t('Dukaan ka code','Shop code')}"><input id="s-name" placeholder="${t('Aapka naam','Your name')}" autocomplete="name"><div class="row"><button class="btn go" id="c-join">${t('Dukaan se judo','Join shop')}</button></div></div>`;
+function wireStaff(){$('c-join').onclick=()=>act(async()=>{const code=$('s-code').value.trim(),name=$('s-name').value.trim();if(!code||!name)throw new Error(t('Dukaan ka code aur apna naam likho','Enter the shop code and your name'));
   if(!(await sb.auth.getSession()).data.session)ck(await sb.auth.signInAnonymously());ck(await sb.rpc('join_store',{join_code:code,staff_name:name}));await findStore()})}
-async function createShop(){const name=$('n-shop').value.trim();if(!name)throw new Error('Enter a shop name');const local=S.products.slice();
+async function createShop(){const name=$('n-shop').value.trim();if(!name)throw new Error(t('Dukaan ka naam likho','Enter a shop name'));const local=S.products.slice();
   ck(await sb.rpc('create_store',{shop_name:name,owner_name:$('n-owner').value.trim()}));await findStore();
   if(store&&!S.products.length)local.forEach(p=>saveProduct({...p,id:nid('p')}));await queue}
 /* Runs a Shop-tab action, shows any error under the cards, then redraws. */
@@ -477,7 +477,7 @@ function saveShop(sh){S.shop=sh;persist();if(db)db.doc('meta/shop').set(sh).catc
 function renderInfo(){const b=$('shopInfo');if(!b||b.contains(document.activeElement))return;const ro=store&&member.role!=='owner';
   b.innerHTML=`<form class="card" id="i-form"><h2>${tm('दुकानाची माहिती','Dukaan ki jaankari','Shop details')}</h2><p>${t('UPI ID daalne par har bill ke saath QR dikhega. Paisa seedha aapke account mein jaata hai, app ke through nahi.','With a UPI ID, every bill shows a QR for that amount. Money goes straight to your account, not through the app.')}</p>
     <input id="i-name" placeholder="${tm('दुकानाचे नाव','Dukaan ka naam','Shop name')}" value="${esc(S.shop.name||'')}" ${ro?'disabled':''}><input id="i-upi" placeholder="UPI ID (name@bank)" value="${esc(S.shop.upi||'')}" autocapitalize="off" ${ro?'disabled':''}>
-    ${ro?'':`<div class="row"><button class="btn go" type="submit">Save</button><span class="status" id="i-msg"></span></div>`}</form>
+    ${ro?'':`<div class="row"><button class="btn go" type="submit">${tm('सेव्ह करा','Save karo','Save')}</button><span class="status" id="i-msg"></span></div>`}</form>
     ${store?'':`<div class="card"><h2>${t('Namoone ka data','Example data')}</h2><p>${t('App aazmaane ke liye 25 aam kirana cheezein, 2 hafte ki banavati bikri aur 4 khate jodta hai. Yeh asli data nahi hai; baad mein Stock tab se hata sakte ho.','Adds 25 common kirana items, two weeks of made-up sales and 4 khata customers so you can try the app. None of it is real; remove items later from the Stock tab.')}</p><div class="row"><button class="btn" type="button" id="i-sample">${t('Namoona data daalo','Load example data')}</button><span class="status" id="i-smsg"></span></div></div>`}`;
   if($('i-sample'))$('i-sample').onclick=()=>{const r=loadSamples();$('i-smsg').textContent=t(`${r.np} cheezein aur ${r.nb} bill jude`,`Added ${r.np} items and ${r.nb} bills`)};
   if(!ro)$('i-form').onsubmit=e=>{e.preventDefault();const upi=$('i-upi').value.trim(),name=$('i-name').value.trim();document.activeElement&&document.activeElement.blur();
@@ -521,10 +521,11 @@ function khataSay(toks,has){const numTok=toks.find(x=>x.num!==undefined),num=num
     if(useBill&&S.bill.length){const sh=short(S.bill);if(sh)return say(t(`Pehle bill theek karo: ${sh}.`,`Fix the bill first: ${sh}.`));recordSale(S.bill);S.bill=[];renderBill()}
     $('payBox').innerHTML='';const cc=c||findCustomer(name)||addCustomer(name);addKhata(cc,pay?-amt:amt,useBill?'bill':'');const b=balance(cc.id);
     say(tm(`लिहिले. ${cc.name} यांची आता ${fm(Math.max(b,0))} बाकी आहे.`,`Likh diya. ${cc.name} ka ab ${fm(Math.max(b,0))} baki hai.`,`Done. ${cc.name} now owes ${fm(Math.max(b,0))}.`))})}
-const remindLink=(c,b)=>'https://wa.me/'+(c.phone||'')+'?text='+encodeURIComponent(`Namaste ${c.name} ji, ${S.shop.name||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`);
+const remindText=(c,b)=>tm(`नमस्कार ${c.name}, ${S.shop.name||'दुकाना'}त तुमची ${fm(b)} बाकी आहे. कृपया जमा करा.${S.shop.upi?' UPI: '+S.shop.upi:''} धन्यवाद.`,`Namaste ${c.name} ji, ${S.shop.name||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`,`Hello ${c.name}, you have ${fm(b)} pending at ${S.shop.name||'our shop'}. Please pay when you can.${S.shop.upi?' UPI: '+S.shop.upi:''} Thank you.`);
+const remindLink=(c,b)=>'https://wa.me/'+(c.phone||'')+'?text='+encodeURIComponent(remindText(c,b));
 function renderKhata(){if(!$('khataList'))return;const rows=S.customers.map(c=>[c,balance(c.id)]).sort((a,b)=>b[1]-a[1]),tot=rows.reduce((a,x)=>a+Math.max(x[1],0),0);
   $('khataHead').textContent=tm('एकूण बाकी: ','Kul baki: ','Total owed: ')+fm(tot);$('k-names').innerHTML=S.customers.map(c=>`<option value="${esc(c.name)}">`).join('');
-  $('khataList').innerHTML=rows.length?rows.map(([c,b])=>`<div class="item" data-c="${esc(c.id)}" tabindex="0" role="button"><b>${esc(c.name)}</b><span class="p ${b>0?'owe':'clear'}">${b>0?fm(b):b<0?t('jama ','advance ')+fm(-b):t('chukta','settled')}</span>${S.kOpen===c.id?`<span class="kdetail">${S.khata.filter(e=>e.cid===c.id).slice(0,8).map(e=>`<div><span>${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</span><span>${e.amount>0?t('udhaar ','credit ')+fm(e.amount):t('jama ','paid ')+fm(-e.amount)}</span></div>`).join('')}<span class="row" style="flex-wrap:nowrap;margin-top:4px"><input class="kph" type="tel" inputmode="numeric" value="${esc((c.phone||'').replace(/^91(?=\d{10}$)/,''))}" placeholder="${t('Mobile number (optional)','Mobile number (optional)')}" aria-label="Mobile number"><button type="button" class="chip" data-ph="${esc(c.id)}">${t('Number save karo','Save number')}</button></span>${b>0?`<a class="btn wa" style="margin:4px 0 0;align-self:flex-start" target="_blank" rel="noopener" href="${remindLink(c,b)}">${c.phone?t('WhatsApp reminder bhejo','Send WhatsApp reminder'):t('WhatsApp reminder (number chuno)','WhatsApp reminder (pick contact)')}</a>`:''}</span>`:''}</div>`).join('')
+  $('khataList').innerHTML=rows.length?rows.map(([c,b])=>`<div class="item" data-c="${esc(c.id)}" tabindex="0" role="button"><b>${esc(c.name)}</b><span class="p ${b>0?'owe':'clear'}">${b>0?fm(b):b<0?t('jama ','advance ')+fm(-b):t('chukta','settled')}</span>${S.kOpen===c.id?`<span class="kdetail">${S.khata.filter(e=>e.cid===c.id).slice(0,8).map(e=>`<div><span>${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.note?' · '+esc(e.note):''}</span><span>${e.amount>0?t('udhaar ','credit ')+fm(e.amount):t('jama ','paid ')+fm(-e.amount)}</span></div>`).join('')}<span class="row" style="flex-wrap:nowrap;margin-top:4px"><input class="kph" type="tel" inputmode="numeric" value="${esc((c.phone||'').replace(/^91(?=\d{10}$)/,''))}" placeholder="${tm('मोबाईल नंबर (ऐच्छिक)','Mobile number (zaroori nahi)','Mobile number (optional)')}" aria-label="Mobile number"><button type="button" class="chip" data-ph="${esc(c.id)}">${tm('नंबर सेव्ह करा','Number save karo','Save number')}</button></span>${b>0?`<a class="btn wa" style="margin:4px 0 0;align-self:flex-start" target="_blank" rel="noopener" href="${remindLink(c,b)}">${c.phone?tm('WhatsApp आठवण पाठवा','WhatsApp reminder bhejo','Send WhatsApp reminder'):tm('WhatsApp आठवण (संपर्क निवडा)','WhatsApp reminder (number chuno)','WhatsApp reminder (pick contact)')}</a>`:''}</span>`:''}</div>`).join('')
     :`<p class="empty">${t('Abhi koi khata nahi. Upar naam aur rakam likho, ya bolo: “Ramesh ke khate mein 200 likho”.','No khata yet. Enter a name and amount above, or say “add 200 to Ramesh khata”.')}</p>`}
 function khataForm(sign){const n=$('k-name').value.trim(),a=parseFloat($('k-amt').value);if(!n||!(a>0)){$('k-msg').textContent=t('Naam aur rakam dono chahiye','Enter both a name and an amount');return}
   const ph=cleanPhone($('k-phone').value);if(ph===null){$('k-msg').textContent=t('Mobile number 10 ank ka hona chahiye','Enter a 10-digit mobile number');return}
@@ -681,9 +682,9 @@ async function writeMessage(text,toks,has){const nm=toks.filter(x=>x.num===undef
   if(kind==='order'&&!plan.length)return say(t('Abhi mangwane ko kuch nahi hai.','Nothing needs ordering right now.'));
   say(t('Message likh raha hoon…','Writing the message…'));
   let msg=await ai('message',{kind,request:text,shop,lang:aiLang(),customer:c?c.name:undefined,amountOwed:c?b:undefined,upiId:kind==='reminder'&&S.shop.upi?S.shop.upi:undefined,items:plan.length?plan.map(x=>`${x.p.name} ${fq(x.order,x.p.unit)}`):undefined});
-  if(!msg)msg=kind==='reminder'?`Namaste ${c.name} ji, ${shop||'dukaan'} par aapka ${fm(b)} baki hai. Kripya jama kar dein.${S.shop.upi?' UPI: '+S.shop.upi:''} Dhanyavaad.`
-    :kind==='order'?`Namaste, ${shop?shop+' se ':''}yeh order bhej dijiye:\n`+plan.map(x=>`- ${x.p.name}: ${fq(x.order,x.p.unit)}`).join('\n')+'\nDhanyavaad.'
-    :kind==='offer'?`Namaste! ${shop||'Hamari dukaan'} par is hafte khaas offer chal raha hai. Zaroor padhaariye. Dhanyavaad.`:null;
+  if(!msg)msg=kind==='reminder'?remindText(c,b)
+    :kind==='order'?t(`Namaste, ${shop?shop+' se ':''}yeh order bhej dijiye:\n`,`Hello, please send this order${shop?' for '+shop:''}:\n`)+plan.map(x=>`- ${x.p.name}: ${fq(x.order,x.p.unit)}`).join('\n')+t('\nDhanyavaad.','\nThank you.')
+    :kind==='offer'?t(`Namaste! ${shop||'Hamari dukaan'} par is hafte khaas offer chal raha hai. Zaroor padhaariye. Dhanyavaad.`,`Hello! ${shop||'Our shop'} has special offers this week. Do visit us. Thank you.`):null;
   if(!msg)return say(NEED_AI());
   S.lastMsg=msg;say(msg,[[t('WhatsApp par bhejo','Send on WhatsApp'),'https://wa.me/'+(kind==='reminder'&&c.phone?c.phone:'')+'?text='+encodeURIComponent(msg),1],[t('Copy karo','Copy'),'#copy']])}
 
@@ -928,31 +929,31 @@ function expiryList(){const l=[];S.products.forEach(p=>bOf(p).forEach(b=>{if(b.e
 /* ---------- rendering ---------- */
 function renderBill(){const b=$('bill');b.hidden=!S.bill.length;$('billEmpty').hidden=!!S.bill.length;if(!S.bill.length)return;
   const txt=S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
-  b.innerHTML=`<h2>Bill</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td><td><button type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody>
-  <tfoot><tr><td colspan="3">Total</td><td class="n">${fm(billTotal())}</td><td></td></tr></tfoot></table>
-  <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">Confirm sale</button><button class="btn" id="b-clear">Clear</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`;
+  b.innerHTML=`<h2>${tm('बिल','Bill','Bill')}</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td><td><button type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.name)}">×</button></td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="3">${tm('एकूण','Kul','Total')}</td><td class="n">${fm(billTotal())}</td><td></td></tr></tfoot></table>
+  <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">${tm('विक्री पक्की करा','Bikri pakki karo','Confirm sale')}</button><button class="btn" id="b-clear">${tm('रिकामे करा','Khali karo','Clear')}</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`;
   b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{S.bill=S.bill.filter(l=>l.id!==x.dataset.rm);renderBill()});$('b-ok').onclick=()=>confirmBill();$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
 function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
   const low=ps.filter(p=>p.low&&p.qty<=p.low).length,exp=ps.filter(p=>p.expiry&&daysTo(p.expiry)<=7).length;
-  $('alerts').textContent=[low&&low+' low on stock',exp&&exp+' expiring within a week'].filter(Boolean).join(' · ');$('reorderBtn').hidden=!lowItems().length;
-  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?'<span class="pill">Low</span>':''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?'Expired':'Expires '+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
-   <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?' · cost '+fm(p.cost):''}</span></button>`).join('')
-   :'<p class="empty">No products yet. Tap Add product, or tell the assistant "cheeni add karo".</p>'}
+  $('alerts').textContent=[low&&tm(`${low} वस्तू कमी आहेत`,`${low} cheezein kam hain`,`${low} low on stock`),exp&&tm(`${exp} लवकर एक्सपायर होणार`,`${exp} jaldi expire hongi`,`${exp} expiring within a week`)].filter(Boolean).join(' · ');$('reorderBtn').hidden=!lowItems().length;
+  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?`<span class="pill">${tm('कमी','Kam','Low')}</span>`:''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?tm('एक्सपायर झाले','Expire ho gaya','Expired'):tm('एक्सपायरी ','Expiry ','Expires ')+new Date(p.expiry).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>`:''}</span>
+   <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?tm(' · खरेदी ',' · kharid ',' · cost ')+fm(p.cost):''}</span></button>`).join('')
+   :`<p class="empty">${tm('अजून वस्तू नाहीत. "बोलून जोडा" दाबा, किंवा सांगा "साखर add करा".','Abhi koi product nahi hai. "Bolkar add karo" dabao, ya bolo "cheeni add karo".','No products yet. Tap "Add by voice", or tell the assistant "add sugar".')}</p>`}
 function renderSales(){const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
-  $('salesHead').textContent=`Today's sales: ${fm(tt)}`;
-  $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):'<p class="empty">No sales yet today.</p>'}
+  $('salesHead').textContent=tm('आजची विक्री: ','Aaj ki bikri: ',"Today's sales: ")+fm(tt);
+  $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):`<p class="empty">${tm('आज अजून विक्री नाही.','Aaj abhi koi bikri nahi hui.','No sales yet today.')}</p>`}
 function renderQuick(){const el=$('quick');el.innerHTML='';[...S.products].sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='+ '+p.name;
   b.onclick=()=>{addToBill([{id:p.id,name:p.name,qty:1,unit:p.unit,rate:p.sell,amount:p.sell}]);$('sellSay').textContent=`${p.name} +1 ${UL[p.unit]}. Total ${fm(billTotal())}`};el.append(b)})}
-const WHY={restock:['Aaya','Restock'],sale:['Bika','Sale'],set:['Sudhar','Correction'],create:['Naya product','New product']};
-const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(m.name)}</span><span class="p" style="font-weight:400">${t(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+t('ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
+const WHY={restock:['आले','Aaya','Restock'],sale:['विकले','Bika','Sale'],set:['दुरुस्ती','Sudhar','Correction'],create:['नवीन वस्तू','Naya product','New product']};
+const moveRow=m=>`<div class="item"><span><b>${m.delta>0?'+':'−'}${fq(Math.abs(m.delta),m.unit)}</b> ${esc(m.name)}</span><span class="p" style="font-weight:400">${tm(...(WHY[m.reason]||WHY.set))}</span><small>${new Date(m.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${m.after!=null?' · '+tm('आता','ab','now')+' '+fq(m.after,m.unit):''}</small></div>`;
 function renderMoves(){$('moveList').innerHTML=S.moves.length?S.moves.slice(0,60).map(moveRow).join(''):'<p class="empty">'+t('Abhi koi stock badlav nahi.','No stock changes yet.')+'</p>'}
 function renderAll(){renderStock();renderSales();renderQuick();renderMoves();renderKhata();renderInfo()}
 
-function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p||!canDel();p=p||{};$('f-sugg').innerHTML='';$('f-smsg').textContent='';
+function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p||!canDel();delete $('f-del').dataset.sure;applyLabels();p=p||{};$('f-sugg').innerHTML='';$('f-smsg').textContent='';
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';const lg=S.moves.filter(m=>m.pid===S.editing).slice(0,6);const bl=p.id?bOf(p).filter(b=>b.qty>0):[];$('f-log').innerHTML=(bl.length>1||bl.some(b=>b.exp)?'<b>'+t('Batch','Batches')+'</b>'+bl.map(b=>`<div class="item"><span>${fq(b.qty,p.unit)}</span><span class="p" style="font-weight:400">${b.exp?fmtD(b.exp):t('date nahi','no date')}</span></div>`).join(''):'')+(lg.length?'<b>'+t('Pichhle badlav','Recent changes')+'</b>'+lg.map(moveRow).join(''):'');$('f-name').focus()}
 $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.editing)||{},n=id=>parseFloat($(id).value)||0,sell=n('f-sell');
   if(!old.id){const nk=key2($('f-name').value),dup=S.products.find(x=>[x.name,...(x.names||[])].some(n=>key2(n)===nk));
-    if(dup){openEdit(dup);$('alerts').textContent=`"${dup.name}" already exists. Edit it here instead of adding it again.`;return}}
+    if(dup){openEdit(dup);$('alerts').textContent=tm(`"${dup.name}" आधीच आहे. इथेच बदला.`,`"${dup.name}" pehle se hai. Isi ko yahan badlo.`,`"${dup.name}" already exists. Edit it here instead of adding it again.`);return}}
   const p={...old,id:old.id||nid('p'),name:$('f-name').value.trim(),names:$('f-names').value.split(',').map(s=>s.trim()).filter(Boolean),unit:$('f-unit').value,qty:n('f-qty'),sell,low:n('f-low')};
   {const nx=$('f-exp').value,dq=r3(p.qty-(old.qty||0));delete p.expiry;
     if(!old.id||dq>0)p.addExp=nx;                       /* new stock takes the date typed */
@@ -960,14 +961,14 @@ $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.
   if($('costOn').checked)p.cost=n('f-cost');else if(p.cost===undefined)p.cost=null;
   if(old.id&&old.sell!==sell)p.history=[...(old.history||[]),{from:old.sell,to:sell,at:Date.now()}];
   saveProduct(p);$('edit').hidden=true};
-$('f-suggest').onclick=async()=>{const nm=$('f-name').value.trim();if(!nm){$('f-smsg').textContent='Type the product name first';return $('f-name').focus()}
-  $('f-smsg').textContent='Looking…';$('f-sugg').innerHTML='';const cur=()=>$('f-names').value.split(',').map(x=>x.trim()).filter(Boolean),list=await suggestNames(nm,cur());
-  $('f-smsg').textContent=list.length?'Tap the ones that are right':'No suggestions for this name';
+$('f-suggest').onclick=async()=>{const nm=$('f-name').value.trim();if(!nm){$('f-smsg').textContent=tm('आधी वस्तूचे नाव लिहा','Pehle product ka naam likho','Type the product name first');return $('f-name').focus()}
+  $('f-smsg').textContent=tm('शोधत आहे…','Dhoondh raha hoon…','Looking…');$('f-sugg').innerHTML='';const cur=()=>$('f-names').value.split(',').map(x=>x.trim()).filter(Boolean),list=await suggestNames(nm,cur());
+  $('f-smsg').textContent=list.length?tm('जी बरोबर आहेत ती निवडा','Jo sahi hon unhe dabao','Tap the ones that are right'):tm('या नावासाठी सूचना नाहीत','Is naam ke liye koi sujhav nahi','No suggestions for this name');
   list.forEach(n=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent='+ '+n;b.onclick=()=>{$('f-names').value=[...cur(),n].join(', ');b.remove()};$('f-sugg').append(b)})};
 $('f-name').onblur=async()=>{if(S.editing)return;const nm=$('f-name').value.trim();if(!nm)return;const u=await guessUnit(nm);
-  if(u&&!S.editing&&$('f-name').value.trim()===nm){$('f-unit').value=u;$('f-smsg').textContent=`Unit set to ${UL[u]} for ${nm}. Change it if that is wrong.`}};
+  if(u&&!S.editing&&$('f-name').value.trim()===nm){$('f-unit').value=u;$('f-smsg').textContent=tm(`${nm} साठी युनिट ${UL[u]} ठेवले. चुकीचे असल्यास बदला.`,`${nm} ke liye unit ${UL[u]} rakha hai. Galat ho to badal do.`,`Unit set to ${UL[u]} for ${nm}. Change it if that is wrong.`)}};
 $('f-cancel').onclick=()=>$('edit').hidden=true;
-$('f-del').onclick=()=>{if($('f-del').dataset.sure){deleteProduct(S.editing);$('edit').hidden=true;delete $('f-del').dataset.sure;$('f-del').textContent='Delete'}else{$('f-del').dataset.sure=1;$('f-del').textContent='Tap again to delete'}};
+$('f-del').onclick=()=>{if($('f-del').dataset.sure){deleteProduct(S.editing);$('edit').hidden=true;delete $('f-del').dataset.sure;applyLabels()}else{$('f-del').dataset.sure=1;$('f-del').textContent=tm('हटवण्यासाठी पुन्हा दाबा','Hatane ke liye dobara dabao','Tap again to delete')}};
 $('newBtn').onclick=()=>openEdit(null);
 $('stockList').onclick=e=>{const b=e.target.closest('.item');if(b)openEdit(S.products.find(p=>p.id===b.dataset.id))};
 $('costOn').onchange=()=>{try{localStorage.setItem('cost',$('costOn').checked?1:'')}catch(e){}renderStock();$('f-cost-l').hidden=!$('costOn').checked};
@@ -982,18 +983,18 @@ function showTab(name){document.querySelectorAll('.tabs button').forEach(x=>x.se
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 /* Mic button: uses the browser's speech recognition where the page is allowed the microphone; otherwise opens the keyboard so its mic key can be used. */
 let rec=null,listening=false;
-function micFallback(why){$('speakNote').textContent=why+' Tap the mic key on your keyboard instead, then Send.';$('say').focus()}
+function micFallback(why){$('speakNote').textContent=why+' '+tm('त्याऐवजी कीबोर्डवरील माइक दाबा, मग पाठवा.','Iski jagah keyboard ka mic dabao, phir Bhejo.','Tap the mic key on your keyboard instead, then Send.');$('say').focus()}
 $('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(listening&&rec){try{rec.stop()}catch(e){}return}
-  if(!SR)return micFallback('This browser has no built-in voice typing.');
+  if(!SR)return micFallback(tm('या ब्राउझरमध्ये बोलून टाइप करता येत नाही.','Is browser mein bolkar likhna nahi chalta.','This browser has no built-in voice typing.'));
   try{rec=new SR();rec.lang=S.lang==='en'?'en-IN':S.lang==='mr'?'mr-IN':'hi-IN';rec.interimResults=true;rec.maxAlternatives=1;let fin='',got=false;
     rec.onstart=()=>{listening=true;$('mic').classList.add('on');$('speakNote').textContent='';$('micLabel').textContent=tm('ऐकत आहे…','Sun raha hoon…','Listening…')};
     rec.onresult=e=>{got=true;let t='';for(const r of e.results){t+=r[0].transcript;if(r.isFinal)fin=t}$('say').value=t};
     rec.onerror=e=>{if(e.error==='no-speech')$('speakNote').textContent=tm('काही ऐकू आले नाही. पुन्हा माइक दाबा.','Kuch sunai nahi diya. Dobara mic dabao.','I did not hear anything. Tap the mic again.');
-      else if(e.error!=='aborted')micFallback(e.error==='not-allowed'||e.error==='service-not-allowed'?'The microphone is blocked for this page.':'Voice typing failed ('+e.error+').')};
+      else if(e.error!=='aborted')micFallback(e.error==='not-allowed'||e.error==='service-not-allowed'?tm('या पेजसाठी माइक बंद आहे.','Is page ke liye mic band hai.','The microphone is blocked for this page.'):tm('बोलून टाइप करणे चालले नाही','Bolkar likhna nahi chala','Voice typing failed')+' ('+e.error+').')};
     rec.onend=()=>{listening=false;$('mic').classList.remove('on');$('micLabel').textContent=tm('दाबा आणि बोला','Tap karke bolo','Tap and speak');
       const v=(fin||(got?$('say').value:'')).trim();if(v){$('say').value='';viaMic=true;handle(v)}};
-    rec.start()}catch(e){micFallback('The microphone could not start.')}};
+    rec.start()}catch(e){micFallback(tm('माइक सुरू झाला नाही.','Mic chalu nahi hua.','The microphone could not start.'))}};
 $('k-scan').onclick=scanKhata;$('photoAdd').onclick=photoProduct;
 $('k-form').onsubmit=e=>{e.preventDefault();khataForm(1)};$('k-paid').onclick=()=>khataForm(-1);
 $('khataList').onclick=e=>{if(e.target.closest('a,input'))return;const sv=e.target.closest('[data-ph]');
@@ -1012,11 +1013,31 @@ function greet(){const th=$('thread'),old=th.querySelector?th.querySelector('.ms
   [['Price of milk?','price of milk'],['How can I grow sales?','give me advice to improve sales'],['1 litre milk and 2 kg sugar','1 litre milk and 2 kg sugar total'],['How much sugar is left?','how much sugar is left'],['Add ragi','add ragi']]:
   [['Dudh kitne ka hai?','dudh kitne ka hai?'],['Hafte ka hisaab','is hafte ka hisaab'],['Kuch gadbad hai?','kuch gadbad hai kya'],['Bikri kaise badhayein?','bikri kaise badhayein?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']];
   const el=$('tips');el.innerHTML='';c.forEach(([l,sd])=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=l;b.onclick=()=>handle(sd);el.append(b)})}
+/* Every fixed label on screen, in Marathi, Hindi and English. kind: text, ph (placeholder), lab (text after a checkbox), first (text before a field). */
+const LABELS=[['[data-tab=talk]','text','विचारा','Pucho','Ask'],['[data-tab=stock]','text','स्टॉक','Stock','Stock'],['[data-tab=sales]','text','विक्री','Becho','Sell'],['[data-tab=khata]','text','खाते','Khata','Khata'],['[data-tab=shop]','text','दुकान','Dukaan','Shop'],
+ ['#speakOn','lab','आवाज','Awaaz','Speak'],['#costOn','lab','खरेदी दर','Kharid','Cost'],['#composer button','text','पाठवा','Bhejo','Send'],['#photoAdd','text','फोटो','Photo','Photo'],
+ ['#pane-stock details.hist summary','text','स्टॉकची नोंद','Stock ka hisaab','Stock log'],['#reorderBtn','text','मागवायची यादी','Mangwane ki list','Reorder list'],
+ ['#f-name','first','नाव','Naam','Name'],['#f-names','first','इतर नावे, स्वल्पविरामाने वेगळी','Doosre naam, comma se alag','Other names, comma separated'],['#f-suggest','text','नावे सुचवा','Naam sujhao','Suggest names'],
+ ['#f-unit','first','युनिट','Unit','Unit'],['#f-qty','first','स्टॉकमधील प्रमाण','Stock mein kitna hai','Quantity in stock'],['#f-sell','first','विक्री दर ₹','Bechne ka rate ₹','Selling price ₹'],['#f-cost','first','खरेदी दर ₹','Kharid ka rate ₹','Cost price ₹'],
+ ['#f-low','first','किमान पातळी','Kam stock ki seema','Low-stock alert at'],['#f-exp','first','एक्सपायरी तारीख (नवीन माल, किंवा सर्वात आधीची बॅच)','Expiry date (naye maal ki, ya sabse pehli batch ki)','Expiry date (of new stock, or the earliest batch)'],
+ ['#edit button[type=submit]','text','सेव्ह करा','Save karo','Save'],['#f-cancel','text','रद्द','Rehne do','Cancel'],['#f-del','text','हटवा','Hatao','Delete'],
+ ['#k-name','ph','ग्राहकाचे नाव','Customer ka naam','Customer name'],['#k-amt','ph','₹','₹','₹'],['#k-phone','ph','मोबाईल नंबर (ऐच्छिक, WhatsApp साठी)','Mobile number (zaroori nahi, WhatsApp reminder ke liye)','Mobile number (optional, for WhatsApp reminders)'],
+ ['#k-form button[type=submit]','text','उधार दिले','Udhaar diya','Gave credit'],['#k-paid','text','पैसे मिळाले','Paisa mila','Got payment'],['#k-scan','text','जुने खाते फोटोवरून घ्या','Purana khata photo se import karo','Import old khata from a photo']];
+const STATUS=[[/^Connecting…$/,'जोडत आहे…','Jud raha hai…'],[/^Saved to your shop$/,'तुमच्या दुकानात सेव्ह','Aapki dukaan mein save hai'],[/^Saved on this device$/,'या फोनवर सेव्ह','Is phone par save hai'],[/^Changes are not saved in this browser$/,'या ब्राउझरमध्ये बदल सेव्ह होत नाहीत','Is browser mein badlav save nahi hote'],
+ [/^Not signed in: changes are not saved$/,'साइन इन नाही: बदल सेव्ह होत नाहीत','Sign in nahi hai: badlav save nahi hote'],[/^Offline: (\d+) waiting to sync$/,'ऑफलाइन: $1 बदल बाकी','Offline: $1 badlav bhejne baki'],[/^Offline.*$/,'ऑफलाइन','Offline'],[/^Synced: (.*)$/,'सिंक झाले: $1','Sync ho gaya: $1'],[/^Not synced$/,'सिंक नाही','Sync nahi hua']];
+function showStatus(){const el=$('status'),raw=el.dataset.raw||'';let out=raw;if(S.lang!=='en')for(const [re,mr,hi] of STATUS)if(re.test(raw)){out=raw.replace(re,S.lang==='mr'?mr:hi);break}if(el.textContent!==out)el.textContent=out}
+function applyLabels(){if(!document.querySelector)return;const i=S.lang==='mr'?2:S.lang==='en'?4:3;
+  for(const L of LABELS){const el=document.querySelector(L[0]);if(!el)continue;const v=L[i];
+    if(L[1]==='ph')el.placeholder=v;else if(L[1]==='lab')el.parentNode.lastChild.textContent=' '+v;else if(L[1]==='first')el.parentNode.firstChild.textContent=v;else if(!el.dataset.sure)el.textContent=v}
+  document.documentElement.lang=S.lang;showStatus()}
+/* The status line is written in English all over the code; this keeps a copy and shows it in the chosen language. */
+if(typeof MutationObserver!=='undefined')new MutationObserver(()=>{const el=$('status'),now=el.textContent;if(STATUS.some(([re])=>re.test(now))&&now!==el.dataset.raw){el.dataset.raw=now}else if(!el.dataset.raw)el.dataset.raw=now;showStatus()}).observe($('status'),{childList:true,characterData:true,subtree:true});
 /* The language switch sets what the mic listens for, the reply language and the voice. */
 function setLang(l,quiet){S.lang=l;try{localStorage.setItem('lang',l)}catch(e){}
   $('lang-hi').setAttribute('aria-pressed',l==='hi');$('lang-mr').setAttribute('aria-pressed',l==='mr');$('lang-en').setAttribute('aria-pressed',l==='en');
   $('micLabel').textContent=tm('दाबा आणि बोला','Tap karke bolo','Tap and speak');$('voiceAddT').textContent=tm('बोलून जोडा','Bolkar add karo','Add by voice');$('newBtn').textContent=tm('लिहून जोडा','Likhkar add karo','Add by typing');$('say').placeholder=mode==='sales'?tm('किंवा लिहा: 2 किलो साखर, 1 Parle-G','Ya likho: 2 kilo cheeni, 1 Parle-G','Or type: 2 kg sugar, 1 Parle-G'):tm('किंवा इथे लिहा: 2 लिटर दूध कितीला?','Ya yahan likho: 2 litre dudh kitne ka hai?','Or type here: price of 2 litre milk');
   $('billEmpty').textContent=tm('बिल रिकामे आहे. माइक दाबा आणि बोला: “2 किलो साखर, 1 पॅकेट Parle-G”, किंवा खालून वस्तू निवडा.','Bill khali hai. Mic dabao aur bolo: “2 kilo cheeni, 1 packet Parle-G”, ya neeche se item chuno.','The bill is empty. Tap the mic and say “2 kg sugar, 1 packet Parle-G”, or pick items below.');
+  applyLabels();renderAll();renderBill();if(sb&&!$('shopBox').hidden)renderShop();
   if(listening&&rec){try{rec.abort()}catch(e){}}if(!quiet)greet()}
 $('lang-hi').onclick=()=>setLang('hi');$('lang-mr').onclick=()=>setLang('mr');$('lang-en').onclick=()=>setLang('en');
 let L0='hi';try{L0=localStorage.getItem('lang')||'hi'}catch(e){}
