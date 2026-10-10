@@ -85,7 +85,7 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
 .tog:has(input:checked){background:var(--haldi-soft);border-color:var(--haldi);color:var(--ink)}
 .tog:has(input:focus-visible){outline:2px solid var(--haldi);outline-offset:2px}
 .seg button{padding:5px 14px}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:0;background:color-mix(in srgb,var(--line) 70%,transparent);border-radius:14px;padding:4px}
+.tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:0;border:0;background:color-mix(in srgb,var(--line) 70%,transparent);border-radius:14px;padding:4px}
 .tabs button{margin:0;border:0;border-radius:10px;padding:8px 6px;text-align:center}
 .tabs button[aria-selected="true"]{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgb(0 0 0/.12)}
 .thread{gap:10px;padding-inline:2px}
@@ -113,6 +113,12 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
 .item{padding:12px 0}
 .pill{background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .form{border-radius:16px}
+.shop{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.card h2{font:600 1.05rem var(--display);margin:0}
+.card p{margin:0;color:var(--muted);font-size:.9rem}
+.card input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);width:100%}
+.code{font:700 1.6rem var(--display);letter-spacing:.2em;color:var(--accent);user-select:all}
 </style>
 <div class="app">
   <header>
@@ -126,6 +132,7 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
     <button role="tab" data-tab="talk" aria-selected="true">Ask</button>
     <button role="tab" data-tab="stock" aria-selected="false">Stock</button>
     <button role="tab" data-tab="sales" aria-selected="false">Sales</button>
+    <button role="tab" data-tab="shop" aria-selected="false" id="shopTab" hidden>Shop</button>
   </div>
 
   <section class="pane" id="pane-talk">
@@ -164,6 +171,11 @@ h1{font-size:1.75rem;letter-spacing:-.01em}
   <section class="pane" id="pane-sales" hidden>
     <h2 id="salesHead">Sales</h2>
     <div class="list" id="salesList"></div>
+  </section>
+
+  <section class="pane" id="pane-shop" hidden>
+    <div class="shop" id="shopBox"></div>
+    <p class="hint" id="shopMsg" style="color:var(--warn)"></p>
   </section>
 </div>
 
@@ -245,15 +257,76 @@ function toBase(q,u,p){if(q==null)q=1;if(!u)return q;const b=p.unit;
 const baseOf=u=>({l:'L',ml:'L',kg:'kg',g:'kg',pc:'pc',dozen:'pc',packet:'packet'}[u]||'pc');
 
 /* ---------- storage ---------- */
-function persist(){if(db)return;try{localStorage.setItem('shop',JSON.stringify({products:S.products,sales:S.sales}))}catch(e){}}
-function saveProduct(p){const i=S.products.findIndex(x=>x.id===p.id);if(i<0)S.products.push(p);else S.products[i]=p;renderAll();persist();
+function persist(){if(db||store)return;try{localStorage.setItem('shop',JSON.stringify({products:S.products,sales:S.sales}))}catch(e){}}
+function saveProduct(p,reason){const i=S.products.findIndex(x=>x.id===p.id),old=i<0?null:S.products[i];if(i<0)S.products.push(p);else S.products[i]=p;renderAll();persist();
+  if(store)enqueue(()=>cloudSave(p,old,reason||'set'));
   if(db){const {id,...d}=p;db.collection('products').doc(id).set(d).catch(e=>say('Save failed: '+(e.message||e.code)+'. Check your connection and try again.'))}}
-function deleteProduct(id){S.products=S.products.filter(p=>p.id!==id);renderAll();persist();if(db)db.collection('products').doc(id).delete().catch(()=>{})}
+function deleteProduct(id){S.products=S.products.filter(p=>p.id!==id);renderAll();persist();if(db)db.collection('products').doc(id).delete().catch(()=>{});
+  if(store)enqueue(async()=>{ck(await sb.from('products').update({deleted:true}).eq('id',id))})}
 function recordSale(lines){const total=Math.round(lines.reduce((a,l)=>a+l.amount,0));
-  for(const l of lines){const p=S.products.find(x=>x.id===l.id);if(p)saveProduct({...p,qty:Math.max(0,Math.round((p.qty-l.qty)*1000)/1000)})}
+  for(const l of lines){const p=S.products.find(x=>x.id===l.id);if(p)saveProduct({...p,qty:Math.max(0,Math.round((p.qty-l.qty)*1000)/1000)},'sale')}
+  if(store){const bill=nid('b'),at=new Date().toISOString(),sid=store.id;enqueue(async()=>{ck(await sb.from('sales').insert(lines.map(l=>({id:nid('s'),store_id:sid,bill_id:bill,product_id:l.id,qty:l.qty,sell_paise:Math.round(l.rate*100),amount_paise:Math.round(l.amount*100),sold_at:at}))))})}
   const sale={items:lines.map(l=>({name:l.name,qty:l.qty,unit:l.unit,rate:l.rate,amount:l.amount})),total,at:Date.now()};
   if(db)db.collection('sales').add(sale).catch(()=>{});else{S.sales.unshift(sale);renderSales();persist()}
   return total}
+
+
+/* ---------- cloud sync (Supabase), used on the hosted site ---------- */
+const SB_URL='https://pmtejfsuceusgzrgvmvp.supabase.co',SB_KEY='sb_publishable_1j9ZLYnvf0rWWNoqmHSdTw_tXKXpDZR';
+let sb=null,session=null,store=null,member=null,queue=Promise.resolve(),otpEmail='';
+const U2R={L:'l',kg:'kg',pc:'piece',packet:'custom:packet'},R2U={l:'L',kg:'kg',piece:'pc','custom:packet':'packet'};
+const nid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const ck=r=>{if(r.error)throw r.error;return r.data};
+const canCost=()=>!member||member.role==='owner'||member.can_see_cost;
+function enqueue(fn){queue=queue.then(fn).then(()=>{if(store)$('status').textContent='Synced: '+store.name},e=>{$('status').textContent='Not synced';$('shopMsg').textContent='Could not save to the cloud: '+(e.message||e)+'. Check the internet, then tap Sync now.'});return queue}
+async function cloudSave(p,old,reason){const sid=store.id;
+  const unit=(p.runit&&!R2U[p.runit]&&p.unit==='pc')?p.runit:U2R[p.unit];
+  ck(await sb.from('products').upsert({id:p.id,store_id:sid,names:[p.name,...(p.names||[])],unit,sell_paise:Math.round(p.sell*100),expiry:p.expiry||null,low_stock_at:p.low||null,deleted:false}));
+  if(p.cost!=null&&canCost()&&(!old||old.cost!==p.cost))ck(await sb.from('product_costs').upsert({product_id:p.id,store_id:sid,cost_paise:Math.round(p.cost*100)}));
+  const delta=Math.round((p.qty-(old?old.qty:0))*1000)/1000;
+  if(delta)ck(await sb.from('stock_moves').insert({id:nid('m'),store_id:sid,product_id:p.id,delta,reason:old?reason:'create',created_at:new Date().toISOString()}))}
+async function allRows(table,cols){let out=[],from=0;for(;;){const d=ck(await sb.from(table).select(cols).eq('store_id',store.id).order(table==='product_costs'?'product_id':'id').range(from,from+999));out=out.concat(d);if(d.length<1000)break;from+=1000}return out}
+async function pull(){if(!store)return;
+  const [ps,cs,ms,ss]=await Promise.all([allRows('products','*'),allRows('product_costs','product_id,cost_paise').catch(()=>[]),allRows('stock_moves','id,product_id,delta'),allRows('sales','id,bill_id,product_id,qty,sell_paise,amount_paise,sold_at')]);
+  const q={},cost={},byId={};ms.forEach(m=>q[m.product_id]=(q[m.product_id]||0)+m.delta);cs.forEach(c=>cost[c.product_id]=c.cost_paise/100);
+  const conv=p=>({id:p.id,name:(p.names&&p.names[0])||'?',names:(p.names||[]).slice(1),unit:R2U[p.unit]||'pc',runit:p.unit,sell:p.sell_paise/100,cost:cost[p.id]??null,qty:Math.round((q[p.id]||0)*1000)/1000,low:p.low_stock_at||0,expiry:p.expiry||''});
+  ps.forEach(p=>byId[p.id]=conv(p));S.products=ps.filter(p=>!p.deleted).map(p=>byId[p.id]);
+  const bills=new Map();ss.forEach(r=>{const b=bills.get(r.bill_id)||{items:[],paise:0,at:+new Date(r.sold_at)};const pr=byId[r.product_id]||{name:'?',unit:'pc'};
+    b.items.push({name:pr.name,qty:r.qty,unit:pr.unit,rate:r.sell_paise/100,amount:r.amount_paise/100});b.paise+=r.amount_paise;bills.set(r.bill_id,b)});
+  S.sales=[...bills.values()].map(b=>({items:b.items,total:Math.round(b.paise/100),at:b.at})).sort((a,b)=>b.at-a.at);renderAll()}
+async function findStore(){session=(await sb.auth.getSession()).data.session;store=null;member=null;if(!session)return;
+  const ms=ck(await sb.from('members').select('store_id,role,name,can_see_cost,can_delete').eq('user_id',session.user.id).limit(1));if(!ms.length)return;
+  member=ms[0];store=ck(await sb.from('stores').select('id,name,code').eq('id',member.store_id).single());
+  $('costOn').closest('label').hidden=!canCost();if(!canCost()){$('costOn').checked=false}
+  await enqueue(pull)}
+function loadScript(src){return new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error('could not load '+src));document.head.append(e)})}
+async function cloudInit(){await loadScript('supabase.js');
+  sb=window.supabase.createClient(SB_URL,SB_KEY);await findStore();renderShop();
+  setInterval(()=>{if(store&&document.visibilityState==='visible'&&!S.pending&&$('edit').hidden)enqueue(pull)},20000)}
+function renderShop(){const b=$('shopBox');
+  if(!sb){b.innerHTML='<div class="card"><h2>Shop account</h2><p>Connecting to the cloud…</p></div>';return}
+  if(store){b.innerHTML=`<div class="card"><h2>${esc(store.name||'Shop')}</h2><p>You are signed in as ${member.role==='owner'?'the owner':'staff'}${member.name?' ('+esc(member.name)+')':''}. Stock and sales sync with every phone of this shop.</p>
+    ${member.role==='owner'?`<p>Staff join with this shop code:</p><div class="code">${esc(store.code)}</div>`:''}
+    <div class="row"><button class="btn go" id="c-sync">Sync now</button><button class="btn" id="c-out">Sign out</button></div></div>`;
+    $('c-sync').onclick=()=>act(()=>enqueue(pull));$('c-out').onclick=()=>act(async()=>{await sb.auth.signOut();location.reload()});return}
+  if(session){b.innerHTML=`<div class="card"><h2>Create your shop</h2><p>You are signed in but have no shop yet. The ${S.products.length} products on this device will be uploaded to it.</p>
+    <input id="n-shop" placeholder="Shop name" autocomplete="organization"><input id="n-owner" placeholder="Your name" autocomplete="name">
+    <div class="row"><button class="btn go" id="c-create">Create shop</button><button class="btn" id="c-out">Sign out</button></div></div>`+staffCard();
+    $('c-create').onclick=()=>act(createShop);$('c-out').onclick=()=>act(async()=>{await sb.auth.signOut();location.reload()});wireStaff();return}
+  b.innerHTML=`<div class="card"><h2>Owner sign-in</h2><p>We email you a 6-digit code. Your shop then syncs across phones and is backed up.</p>
+    ${otpEmail?`<p>Code sent to ${esc(otpEmail)}.</p><input id="o-code" inputmode="numeric" placeholder="6-digit code" autocomplete="one-time-code"><div class="row"><button class="btn go" id="c-verify">Verify</button><button class="btn" id="c-back">Change email</button></div>`
+      :`<input id="o-email" type="email" placeholder="Email address" autocomplete="email"><div class="row"><button class="btn go" id="c-send">Send code</button></div>`}</div>`+staffCard();
+  if(otpEmail){$('c-verify').onclick=()=>act(async()=>{ck(await sb.auth.verifyOtp({email:otpEmail,token:$('o-code').value.trim(),type:'email'}));otpEmail='';await findStore()});$('c-back').onclick=()=>{otpEmail='';renderShop()}}
+  else $('c-send').onclick=()=>act(async()=>{const e=$('o-email').value.trim();if(!e)throw new Error('Enter your email address');ck(await sb.auth.signInWithOtp({email:e,options:{shouldCreateUser:true}}));otpEmail=e});
+  wireStaff()}
+const staffCard=()=>`<div class="card"><h2>Join as staff</h2><p>Ask the owner for the shop's 6-digit code.</p><input id="s-code" inputmode="numeric" placeholder="Shop code"><input id="s-name" placeholder="Your name" autocomplete="name"><div class="row"><button class="btn go" id="c-join">Join shop</button></div></div>`;
+function wireStaff(){$('c-join').onclick=()=>act(async()=>{const code=$('s-code').value.trim(),name=$('s-name').value.trim();if(!code||!name)throw new Error('Enter the shop code and your name');
+  if(!(await sb.auth.getSession()).data.session)ck(await sb.auth.signInAnonymously());ck(await sb.rpc('join_store',{join_code:code,staff_name:name}));await findStore()})}
+async function createShop(){const name=$('n-shop').value.trim();if(!name)throw new Error('Enter a shop name');const local=S.products.slice();
+  ck(await sb.rpc('create_store',{shop_name:name,owner_name:$('n-owner').value.trim()}));await findStore();
+  if(store&&!S.products.length)local.forEach(p=>saveProduct({...p,id:nid('p')}));await queue}
+/* Runs a Shop-tab action, shows any error under the cards, then redraws. */
+async function act(fn){$('shopMsg').textContent='';try{await fn()}catch(e){$('shopMsg').textContent=e.message||String(e)}renderShop();if(store)$('status').textContent='Synced: '+store.name}
 
 /* ---------- conversation ---------- */
 const t=(hi,en)=>S.lang==='en'?en:hi;
@@ -325,7 +398,7 @@ function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p
 function advanceAdd(){const a=S.pending;
   if(!a.p&&!a.name){a.step='name';return say(t('Kaunsa product?','Which product?'))}
   if(a.qty==null){a.step='qty';return say(a.p?t(`${a.p.name} already hai, ${fm(a.p.sell)} per ${UL[a.p.unit]}. Kitna aaya?`,`${a.p.name} exists at ${fm(a.p.sell)} per ${UL[a.p.unit]}. How much came in?`):t('Kitna aaya? (jaise 20 litre)','How much? (e.g. 20 litre)'))}
-  if(!a.p&&a.cost==null){a.step='cost';return say(t('Kharid ka rate kya hai?','Cost price?'))}
+  if(!a.p&&a.cost==null&&canCost()){a.step='cost';return say(t('Kharid ka rate kya hai?','Cost price?'))}
   if(a.sell==null){if(a.p){a.step='sellkeep';return say(t(`Selling price ${fm(a.p.sell)} hi rahega?`,`Keep the selling price at ${fm(a.p.sell)}?`),YN())}a.step='sell';return say(t('Bechne ka rate?','Selling price?'))}
   if(a.exp===undefined){a.step='exp';return say(t('Expiry date batani hai? (jaise 14 Oct, ya nahi)','Expiry date? (e.g. 14 Oct, or no)'),[[t('Nahi','No'),'nahi']])}
   a.step='confirm';const nm=a.p?a.p.name:a.name,u=a.p?a.p.unit:baseOf(a.unit),q=a.p?toBase(a.qty,a.unit,a.p):toBase(a.qty,a.unit,{unit:u});
@@ -347,8 +420,8 @@ function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==
     case'exp':if(no)a.exp=null;else{const d=parseDate(text);if(!d){say(t('Date samajh nahi aayi. "14 Oct" jaise bolo, ya "nahi".','I could not read that date. Say it like "14 Oct", or "no".'));return true}a.exp=d}break;
     case'confirm':S.pending=null;if(!yes){say(t('Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}
       if(a.p){const p=S.products.find(x=>x.id===a.p.id)||a.p,n={...p,qty:Math.round((p.qty+a.q)*1000)/1000,sell:a.sell};if(a.exp)n.expiry=a.exp;
-        if(a.sell!==p.sell)n.history=[...(p.history||[]),{from:p.sell,to:a.sell,at:Date.now()}];saveProduct(n);say(t(`${p.name} ab ${fq(n.qty,n.unit)} hai.`,`${p.name} is now ${fq(n.qty,n.unit)}.`))}
-      else{saveProduct({id:'p'+Date.now().toString(36),name:a.name,names:[],unit:a.u,qty:a.q,cost:a.cost,sell:a.sell,low:0,expiry:a.exp||''});say(t(`${a.name} jud gaya. Stock tab mein aur naam jod sakte ho.`,`${a.name} added. You can add more names in the Stock tab.`))}
+        if(a.sell!==p.sell)n.history=[...(p.history||[]),{from:p.sell,to:a.sell,at:Date.now()}];saveProduct(n,'restock');say(t(`${p.name} ab ${fq(n.qty,n.unit)} hai.`,`${p.name} is now ${fq(n.qty,n.unit)}.`))}
+      else{saveProduct({id:nid('p'),name:a.name,names:[],unit:a.u,qty:a.q,cost:a.cost,sell:a.sell,low:0,expiry:a.exp||''});say(t(`${a.name} jud gaya. Stock tab mein aur naam jod sakte ho.`,`${a.name} added. You can add more names in the Stock tab.`))}
       return true}
   advanceAdd();return true}
 
@@ -379,7 +452,7 @@ function renderAll(){renderStock();renderSales()}
 function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p;p=p||{};
   $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';$('f-name').focus()}
 $('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.editing)||{},n=id=>parseFloat($(id).value)||0,sell=n('f-sell');
-  const p={...old,id:old.id||'p'+Date.now().toString(36),name:$('f-name').value.trim(),names:$('f-names').value.split(',').map(s=>s.trim()).filter(Boolean),unit:$('f-unit').value,qty:n('f-qty'),sell,low:n('f-low'),expiry:$('f-exp').value};
+  const p={...old,id:old.id||nid('p'),name:$('f-name').value.trim(),names:$('f-names').value.split(',').map(s=>s.trim()).filter(Boolean),unit:$('f-unit').value,qty:n('f-qty'),sell,low:n('f-low'),expiry:$('f-exp').value};
   if($('costOn').checked)p.cost=n('f-cost');else if(p.cost===undefined)p.cost=null;
   if(old.id&&old.sell!==sell)p.history=[...(old.history||[]),{from:old.sell,to:sell,at:Date.now()}];
   saveProduct(p);$('edit').hidden=true};
@@ -392,7 +465,7 @@ $('speakOn').onchange=()=>{try{localStorage.setItem('speak',$('speakOn').checked
   if($('speakOn').checked)speak('Awaaz chalu hai');else{$('speakNote').textContent='';try{speechSynthesis.cancel()}catch(e){}}};
 try{$('costOn').checked=!!localStorage.getItem('cost');$('speakOn').checked=!!localStorage.getItem('speak')}catch(e){}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
-  ['talk','stock','sales'].forEach(n=>$('pane-'+n).hidden=n!==b.dataset.tab)});
+  ['talk','stock','sales','shop'].forEach(n=>$('pane-'+n).hidden=n!==b.dataset.tab)});
 /* Mic button: uses the browser's speech recognition where the page is allowed the microphone; otherwise opens the keyboard so its mic key can be used. */
 let rec=null,listening=false;
 function micFallback(why){$('speakNote').textContent=why+' Tap the mic key on your keyboard instead, then Send.';$('say').focus()}
@@ -426,7 +499,9 @@ setLang(L0,true);greet();
   try{db=c?await c.use('db'):null}catch(e){db=null}
   try{sample=c?await c.use('sample'):null}catch(e){sample=null}
   if(!db){let ok=false;try{const d=JSON.parse(localStorage.getItem('shop')||'null');if(d){S.products=d.products||[];S.sales=d.sales||[]}else if(window.SEED)S.products=window.SEED;localStorage.setItem('shop-ok','1');ok=true}catch(e){}
-    renderAll();$('status').textContent=ok?'Saved on this device':'Changes are not saved in this browser';return}
+    renderAll();$('status').textContent=ok?'Saved on this device':'Changes are not saved in this browser';
+    if(location.protocol.startsWith('http')&&!c){$('shopTab').hidden=false;renderShop();cloudInit().catch(e=>{$('shopMsg').textContent='Cloud is not reachable: '+(e.message||e)})}
+    return}
   $('status').textContent='Saved to your shop';
   const fail=e=>{$('status').textContent='Offline: '+(e.message||e.code)};
   db.collection('products').onSnapshot(s=>{S.products=s.docs.map(d=>({id:d.id,...d.data()}));renderAll()},fail);
