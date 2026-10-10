@@ -5,8 +5,9 @@
 
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { confirmAction, notify } from '@/components/notify';
 import { Button, Chip, Field } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import {
@@ -76,7 +77,7 @@ export function AccountSection() {
     try {
       await work();
     } catch (e) {
-      Alert.alert('Could not finish', message(e));
+      notify('Could not finish', message(e));
     } finally {
       setBusy(false);
     }
@@ -94,7 +95,7 @@ export function AccountSection() {
       const { restored } = await verifyOwnerCode(db, email, code, name);
       setCode('');
       setCodeSent(false);
-      Alert.alert(restored ? 'Your shop is back on this phone' : 'Your shop is now backed up');
+      notify(restored ? 'Your shop is back on this phone' : 'Your shop is now backed up');
     });
 
   const join = () =>
@@ -106,15 +107,13 @@ export function AccountSection() {
     });
 
   const leave = () =>
-    Alert.alert(
+    confirmAction(
       'Sign out?',
       isOwner
         ? 'Your products stay on this phone and in the cloud.'
         : "The shop's products and sales will be removed from this phone.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => run(() => signOut(db)) },
-      ],
+      'Sign out',
+      () => run(() => signOut(db)),
     );
 
   const toggle = (m: TeamMember, key: 'can_see_cost' | 'can_delete') =>
@@ -124,18 +123,12 @@ export function AccountSection() {
     });
 
   const remove = (m: TeamMember) =>
-    Alert.alert(`Remove ${m.name || 'this person'}?`, 'They will no longer see the shop.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () =>
-          run(async () => {
-            await removeMember(db, m.user_id);
-            await loadTeam();
-          }),
-      },
-    ]);
+    confirmAction(`Remove ${m.name || 'this person'}?`, 'They will no longer see the shop.', 'Remove', () =>
+      run(async () => {
+        await removeMember(db, m.user_id);
+        await loadTeam();
+      }),
+    );
 
   const muted = { color: theme.textSecondary };
 

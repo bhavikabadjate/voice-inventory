@@ -2,11 +2,12 @@
 // cost and selling price, stock and an optional expiry date.
 
 import { useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { confirmAction, notify } from '@/components/notify';
 import { Button, Chip, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
 import { formatRupees, type Product } from '@/core/billing';
 import { findProducts } from '@/core/names';
 import { unitLabel, type Unit } from '@/core/units';
@@ -66,10 +67,10 @@ export default function ProductsScreen() {
   const save = async () => {
     if (!draft) return;
     const names = draft.names.split(/[,\n]/).map((n) => n.trim()).filter(Boolean);
-    if (!names.length) return Alert.alert('Add at least one name');
-    if (!draft.sell.trim()) return Alert.alert('Add the selling price');
+    if (!names.length) return notify('Add at least one name');
+    if (!draft.sell.trim()) return notify('Add the selling price');
     if (draft.expiry && !/^\d{4}-\d{2}-\d{2}$/.test(draft.expiry)) {
-      return Alert.alert('Expiry date should look like 2026-10-31');
+      return notify('Expiry date should look like 2026-10-31');
     }
     await saveProduct(db, {
       id: draft.id ?? newProductId(),
@@ -88,18 +89,11 @@ export default function ProductsScreen() {
   const remove = () => {
     if (!draft?.id) return;
     const id = draft.id;
-    Alert.alert('Delete this product?', draft.names, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteProduct(db, id);
-          setDraft(null);
-          refresh();
-        },
-      },
-    ]);
+    confirmAction('Delete this product?', draft.names, 'Delete', async () => {
+      await deleteProduct(db, id);
+      setDraft(null);
+      refresh();
+    });
   };
 
   const addSamples = async () => {
@@ -213,7 +207,7 @@ export default function ProductsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth },
+  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
   header: { padding: Spacing.three, gap: Spacing.three },
   form: { padding: Spacing.four, gap: Spacing.three },
   title: { fontSize: 24, fontWeight: '700' },
