@@ -6,6 +6,9 @@
 //   "2 litre dudh becha"                  sale
 //   "dudh ka rate 58 kar do"              change selling price
 //   "cheeni kitni bachi hai"              stock question
+//   "Ramesh ke khate mein 200 likho"      udhaar given
+//   "Ramesh ne 100 jama kiye"             payment received
+//   "Ramesh ka kitna baki hai"            what a customer owes
 // Anything it doesn't recognise is returned as `unknown`.
 
 import { parseNumberWord, toAsciiDigits } from './numbers';
@@ -27,6 +30,9 @@ export type Command =
   | { kind: 'stock'; lang: Lang; name: string }
   | { kind: 'confirmBill'; lang: Lang }
   | { kind: 'alerts'; lang: Lang; which: 'expiry' | 'low' | 'all' }
+  | { kind: 'khataAdd'; lang: Lang; name: string; rupees: number | null; direction: 'gave' | 'got' }
+  | { kind: 'khataBalance'; lang: Lang; name: string }
+  | { kind: 'khataList'; lang: Lang }
   | { kind: 'yes'; lang: Lang }
   | { kind: 'no'; lang: Lang }
   | { kind: 'unknown'; lang: Lang; text: string };
@@ -92,8 +98,46 @@ const ACTION_FILLERS = new Set([
   'आज', 'अभी', 'झाला', 'झाले', 'करा', 'टाका', 'daalo', 'dalo', 'डालो',
 ]);
 
+// Khata (udhaar) words.
+const KHATA_WORDS = new Set([
+  'udhaar', 'udhar', 'udhaari', 'udhari', 'khata', 'khate', 'khaata', 'khaate', 'credit',
+  'उधार', 'उधारी', 'खाता', 'खाते', 'खात्यात', 'khatyat',
+]);
+const PAID_WORDS = new Set([
+  'jama', 'paid', 'payment', 'chukaya', 'chukaye', 'chukta', 'wapas', 'vapas', 'waapas', 'bhare', 'bharle',
+  'bharla', 'जमा', 'चुकाया', 'चुकाए', 'वापस', 'भरले', 'भरला',
+]);
+// "Ramesh ne 100 diye": the customer gave money.
+const GAVE_MONEY_WORDS = new Set(['diye', 'diya', 'दिए', 'दिया', 'dile', 'दिले']);
+const BALANCE_WORDS = new Set([
+  'baki', 'baaki', 'baqi', 'hisaab', 'hisab', 'owe', 'owes', 'due', 'outstanding', 'pending',
+  'बाकी', 'हिसाब', 'येणे', 'yene',
+]);
+const QUESTION_WORDS = new Set(['kitna', 'kitne', 'kitni', 'kiti', 'how', 'kya', 'कितना', 'कितने', 'किती', 'क्या']);
+// Words around a customer's name that are never part of it.
+const KHATA_FILLERS = new Set([
+  'ne', 'se', 'ko', 'ke', 'ki', 'ka', 'likho', 'likh', 'likha', 'likhna', 'likhiye', 'lihaa', 'liha', 'daalo', 'dalo',
+  'daal', 'dal', 'par', 'pe', 'me', 'mein', 'madhe', 'rs', 'rupees', 'rupee', 'rupaye', 'rupay', 'रुपये', 'रुपए', '₹',
+  'to', 'from', 'in', 'on', 'add', 'kiye', 'kiya', 'kar', 'karo', 'de', 'do', 'diye', 'diya', 'bill', 'isko', 'ise',
+  'yeh', 'ye', 'is', 'this', 'gave', 'got', 'received', 'mila', 'mile', 'मिले', 'मिला', 'ला', 'ने', 'से', 'को', 'के', 'का',
+  'की', 'में', 'पर', 'लिखो', 'लिहा', 'डालो', 'बिल', 'kela', 'kele', 'केले', 'केला', 'zhale', 'jhale', 'kitna',
+  'kitne', 'kiti', 'how', 'much', 'does', 'kya', 'hai', 'aahe', 'हैं', 'है', 'आहे', 'ahe', 'sabse', 'zyada',
+  'jyada', 'who', 'kiska', 'kis', 'kaun', 'list', 'सबसे', 'ज़्यादा', 'ज्यादा', 'किसका', 'कौन', 'konache', 'konacha',
+  'chya', 'kade', 'kadun', 'liha', 'च्या', 'कडे', 'कडून', 'लिहा',
+]);
+
+// Marathi joins "of", "from" and "to" onto the name: "रमेशच्या", "रमेशकडून".
+const NAME_SUFFIXES = ['च्या', 'कडून', 'कडे', 'chya', 'kadun', 'kade'];
+
+function stripNameSuffix(token: string): string {
+  for (const suffix of NAME_SUFFIXES) {
+    if (token.length > suffix.length + 2 && token.endsWith(suffix)) return token.slice(0, -suffix.length);
+  }
+  return token;
+}
+
 const MARATHI_HINTS = ['kiti', 'aahe', 'ahe', 'zhala', 'jhala', 'ani', 'aani', 'kara', 'aale', 'aala', 'vikla', 'vikle', 'shillak', 'nako', 'hoy', 'किती', 'आहे', 'झाले', 'झाला', 'आणि', 'एकूण', 'सांगा'];
-const HINDI_HINTS = ['kitne', 'kitna', 'kitni', 'hai', 'hua', 'aur', 'kya', 'ka', 'bata', 'batao', 'karo', 'kar', 'aaya', 'aayi', 'aya', 'ayi', 'becha', 'bechi', 'bika', 'biki', 'gaya', 'bacha', 'bachi', 'nahi', 'haan', 'pakka', 'कितने', 'कितना', 'है', 'हुआ', 'और', 'क्या'];
+const HINDI_HINTS = ['udhaar', 'udhar', 'likho', 'jama', 'baki', 'diye', 'isko', 'daalo', 'khate', 'mein', 'kitne', 'kitna', 'kitni', 'hai', 'hua', 'aur', 'kya', 'ka', 'bata', 'batao', 'karo', 'kar', 'aaya', 'aayi', 'aya', 'ayi', 'becha', 'bechi', 'bika', 'biki', 'gaya', 'bacha', 'bachi', 'nahi', 'haan', 'pakka', 'कितने', 'कितना', 'है', 'हुआ', 'और', 'क्या'];
 
 export function detectLang(tokens: string[]): Lang {
   if (tokens.some((t) => MARATHI_HINTS.includes(t))) return 'mr';
@@ -153,6 +197,41 @@ function parseItems(tokens: string[], drop: Set<string>): ItemRequest[] {
 
 const has = (tokens: string[], words: Set<string>) => tokens.some((t) => words.has(t));
 
+/** Udhaar commands, or null when this isn't about a customer's khata. */
+function parseKhata(tokens: string[], lang: Lang): Command | null {
+  const khata = has(tokens, KHATA_WORDS);
+  const paid =
+    has(tokens, PAID_WORDS) ||
+    (tokens.includes('ne') && has(tokens, GAVE_MONEY_WORDS)) ||
+    // "Ramesh se 100 mile"
+    (tokens.includes('se') && tokens.some((t) => ['mile', 'mila', 'मिले', 'मिला'].includes(t)) &&
+      tokens.some((t) => parseNumberWord(t) !== null));
+  const balance = has(tokens, BALANCE_WORDS);
+  if (!khata && !paid && !balance) return null;
+  // "2 kilo cheeni udhaar" is a sale on credit, which needs a bill first.
+  if (tokens.some((t) => parseUnit(t) !== null)) return null;
+
+  const numbers = tokens
+    .filter((t) => t !== 'do')
+    .map(parseNumberWord)
+    .filter((n): n is number => n !== null);
+  const rupees = numbers.length ? numbers[numbers.length - 1] : null;
+  const name = tokens
+    .map((t) => stripNameSuffix(t.replace(/'s$/, '')))
+    .filter((t) => parseNumberWord(t) === null || t === 'do')
+    .filter((t) => !KHATA_WORDS.has(t) && !PAID_WORDS.has(t) && !BALANCE_WORDS.has(t) && !QUESTION_WORDS.has(t))
+    .filter((t) => !KHATA_FILLERS.has(t) && !STOPWORDS.has(t) && !ACTION_FILLERS.has(t) && !FILLERS.has(t))
+    .join(' ');
+
+  if (!name) return khata || balance ? { kind: 'khataList', lang } : null;
+  if (rupees === null && (balance || (khata && !paid && has(tokens, QUESTION_WORDS)))) {
+    return { kind: 'khataBalance', lang, name };
+  }
+  if (paid) return { kind: 'khataAdd', lang, name, rupees, direction: 'got' };
+  if (khata) return { kind: 'khataAdd', lang, name, rupees, direction: 'gave' };
+  return null;
+}
+
 export function parseCommand(text: string): Command {
   const tokens = tokenize(text);
   const lang = detectLang(tokens);
@@ -164,6 +243,9 @@ export function parseCommand(text: string): Command {
     if (core.every((t) => YES_WORDS.has(t))) return { kind: 'yes', lang };
     if (core.every((t) => NO_WORDS.has(t))) return { kind: 'no', lang };
   }
+
+  const khata = parseKhata(tokens, lang);
+  if (khata) return khata;
 
   if (has(tokens, BILL_WORDS) && has(tokens, FINALISE_WORDS)) return { kind: 'confirmBill', lang };
 

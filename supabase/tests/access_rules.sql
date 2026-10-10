@@ -77,4 +77,20 @@ select pg_temp.expect((select count(*) = 1 from product_costs), 'allowed staff s
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 update products set deleted = true where id = 'milk';
 select pg_temp.expect((select deleted from products where id = 'milk'), 'owner can delete');
+-- Khata: staff write udhaar; nobody can change or delete an entry; strangers see nothing.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+insert into customers (id, store_id, name) select 'ramesh', id, 'Ramesh' from shop;
+insert into khata_entries (id, store_id, customer_id, amount_paise) select 'k1', id, 'ramesh', 20000 from shop;
+select pg_temp.expect((select sum(amount_paise) = 20000 from khata_entries), 'staff writes udhaar');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+update khata_entries set amount_paise = 0 where id = 'k1';
+delete from khata_entries where id = 'k1';
+select pg_temp.expect((select amount_paise = 20000 from khata_entries where id = 'k1'),
+  'owner cannot change or delete a khata entry');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect((select count(*) = 0 from khata_entries), 'stranger sees no khata');
+select pg_temp.expect((select count(*) = 0 from customers), 'stranger sees no customers');
+select pg_temp.expect_error(
+  $q$insert into khata_entries (id, store_id, customer_id, amount_paise) select 'k2', id, 'ramesh', -100 from shop$q$,
+  'stranger writing a khata entry');
 \echo ALL ACCESS RULE CHECKS PASSED

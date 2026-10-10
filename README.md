@@ -29,6 +29,11 @@ The product plan lives in the project files (`plans/voice-inventory-plan.md`).
 - **Shop tab**: items expiring within 7 days and items running low (at or below a
   level you set per product, or out of stock). Also by voice: "kya expire hone
   wala hai", "kya khatam ho raha hai". Shop name, phone and UPI ID for bills.
+- **Khata (udhaar)**: by voice, "Ramesh ke khate mein 200 likho", "Ramesh ne 100
+  jama kiye", "Ramesh ka kitna baki hai", "sabse zyada udhaar kiska hai", or right
+  after a bill, "isko Ramesh ke khate mein daalo". The Khata tab lists who owes
+  what, each customer's history, and sends a WhatsApp reminder with a UPI pay link.
+  Entries are never edited or deleted; a mistake is fixed with an entry the other way.
 - **Cloud backup and staff** (Shop tab): the owner signs in with a code sent to
   their email; the shop's products, stock and sales are then backed up and come
   back on a new phone. Staff join with the shop's 6-digit code. The owner decides

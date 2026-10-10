@@ -57,13 +57,15 @@ const CONFLICT_KEY: Record<Table, string> = {
   product_costs: 'product_id',
   stock_moves: 'id',
   sales: 'id',
+  customers: 'id',
+  khata_entries: 'id',
 };
 
 function supabaseRemote(storeId: string): Remote {
   return {
     async upsert(table, rows) {
-      // Stock movements and sales never change once made, so a repeat is skipped.
-      const onlyNew = table === 'stock_moves' || table === 'sales';
+      // Stock movements, sales and khata entries never change once made, so a repeat is skipped.
+      const onlyNew = table === 'stock_moves' || table === 'sales' || table === 'khata_entries';
       check(await supabase.from(table).upsert(rows, { onConflict: CONFLICT_KEY[table], ignoreDuplicates: onlyNew }));
     },
     async pull<T>(table: Table, column: string, since: string | null, limit: number) {

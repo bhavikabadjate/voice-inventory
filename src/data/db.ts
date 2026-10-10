@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { emptyShop, type Shop } from '@/core/bill-document';
 import type { Product } from '@/core/billing';
 import type { Action } from '@/core/conversation';
+import type { Customer, KhataEntry } from '@/core/khata';
 import {
   newSyncId,
   type Local,
@@ -80,6 +81,27 @@ export async function migrate(db: SQLiteDatabase) {
         payload TEXT NOT NULL
       );
       PRAGMA user_version = 2;
+    `);
+  }
+  if (version < 3) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL DEFAULT '',
+        deleted INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS khata_entries (
+        id TEXT PRIMARY KEY NOT NULL,
+        customer_id TEXT NOT NULL,
+        amount_paise INTEGER NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        bill_id TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS khata_entries_customer ON khata_entries (customer_id, created_at);
+      PRAGMA user_version = 3;
     `);
   }
 }
@@ -348,10 +370,115 @@ export async function applyAction(db: SQLiteDatabase, action: Action) {
           await recordMove(db, line.productId, -line.qty, 'sale', now);
           await enqueue(db, { kind: 'sale', row: sale });
         }
+        if (action.credit) {
+          const customerId = await ensureCustomer(db, action.credit.customerId, action.credit.name, now);
+          await writeKhata(db, customerId, action.credit.amountPaise, 'Bill', billId, now);
+        }
       });
       break;
     }
+    case 'khata':
+      await db.withTransactionAsync(async () => {
+        const customerId = await ensureCustomer(db, action.customerId, action.name, now);
+        await writeKhata(db, customerId, action.amountPaise, '', null, now);
+      });
+      break;
   }
+  changed();
+}
+
+// ---- Khata (udhaar) -------------------------------------------------------
+
+interface CustomerRow {
+  id: string;
+  name: string;
+  phone: string;
+  deleted: number;
+  updated_at: string;
+}
+
+interface KhataRow {
+  id: string;
+  customer_id: string;
+  amount_paise: number;
+  note: string;
+  bill_id: string | null;
+  created_at: string;
+}
+
+function customerToRemote(c: CustomerRow) {
+  return { id: c.id, name: c.name, phone: c.phone, deleted: !!c.deleted };
+}
+
+function khataToRemote(k: KhataRow) {
+  return {
+    id: k.id, customer_id: k.customer_id, amount_paise: k.amount_paise, note: k.note,
+    bill_id: k.bill_id, created_at: k.created_at,
+  };
+}
+
+/** Customers with what each owes, by name. */
+export async function listCustomers(db: SQLiteDatabase): Promise<Customer[]> {
+  const rows = await db.getAllAsync<{ id: string; name: string; phone: string; balance: number | null }>(
+    `SELECT c.id, c.name, c.phone, (SELECT SUM(amount_paise) FROM khata_entries k WHERE k.customer_id = c.id) AS balance
+     FROM customers c WHERE c.deleted = 0 ORDER BY c.name COLLATE NOCASE`,
+  );
+  return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, balancePaise: r.balance ?? 0 }));
+}
+
+/** A customer's khata, newest first. */
+export async function customerEntries(db: SQLiteDatabase, customerId: string): Promise<KhataEntry[]> {
+  const rows = await db.getAllAsync<KhataRow>(
+    'SELECT * FROM khata_entries WHERE customer_id = ? ORDER BY created_at DESC',
+    customerId,
+  );
+  return rows.map((r) => ({
+    id: r.id, customerId: r.customer_id, amountPaise: r.amount_paise, note: r.note, billId: r.bill_id, at: r.created_at,
+  }));
+}
+
+/** Add or update a customer's name and phone. Returns the customer's id. */
+export async function saveCustomer(db: SQLiteDatabase, c: { id: string | null; name: string; phone: string }) {
+  const id = c.id ?? newSyncId('c');
+  await db.runAsync(
+    `INSERT INTO customers (id, name, phone, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name, phone = excluded.phone, updated_at = excluded.updated_at`,
+    id, c.name.trim(), c.phone.trim(), new Date().toISOString(),
+  );
+  await enqueueCustomer(db, id);
+  changed();
+  return id;
+}
+
+async function enqueueCustomer(db: SQLiteDatabase, id: string) {
+  const row = await db.getFirstAsync<CustomerRow>('SELECT * FROM customers WHERE id = ?', id);
+  if (row) await enqueue(db, { kind: 'customer', row: customerToRemote(row) });
+}
+
+async function ensureCustomer(db: SQLiteDatabase, id: string | null, name: string, now: string): Promise<string> {
+  if (id) return id;
+  const newId = newSyncId('c');
+  await db.runAsync('INSERT INTO customers (id, name, phone, updated_at) VALUES (?, ?, ?, ?)', newId, name, '', now);
+  await enqueueCustomer(db, newId);
+  return newId;
+}
+
+async function writeKhata(
+  db: SQLiteDatabase, customerId: string, amountPaise: number, note: string, billId: string | null, now: string,
+) {
+  const row: KhataRow = {
+    id: newSyncId('k'), customer_id: customerId, amount_paise: amountPaise, note, bill_id: billId, created_at: now,
+  };
+  await db.runAsync(
+    'INSERT INTO khata_entries (id, customer_id, amount_paise, note, bill_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    row.id, customerId, amountPaise, note, billId, now,
+  );
+  await enqueue(db, { kind: 'khata', row: khataToRemote(row) });
+}
+
+/** Udhaar given (positive) or payment received (negative), typed in on the Khata tab. */
+export async function addKhataEntry(db: SQLiteDatabase, customerId: string, amountPaise: number, note: string) {
+  await db.withTransactionAsync(() => writeKhata(db, customerId, amountPaise, note, null, new Date().toISOString()));
   changed();
 }
 
@@ -398,6 +525,12 @@ export async function linkNewStore(db: SQLiteDatabase, store: StoreLink, members
         },
       });
     }
+    for (const c of await db.getAllAsync<CustomerRow>('SELECT * FROM customers')) {
+      await enqueue(db, { kind: 'customer', row: customerToRemote(c) });
+    }
+    for (const k of await db.getAllAsync<KhataRow>('SELECT * FROM khata_entries ORDER BY created_at')) {
+      await enqueue(db, { kind: 'khata', row: khataToRemote(k) });
+    }
   });
   changed();
 }
@@ -426,6 +559,8 @@ async function clearShopData(db: SQLiteDatabase) {
   await db.execAsync(`
     DELETE FROM products;
     DELETE FROM sales;
+    DELETE FROM customers;
+    DELETE FROM khata_entries;
     DELETE FROM stock_moves;
     DELETE FROM price_history;
     DELETE FROM outbox;
@@ -473,6 +608,21 @@ export function sqliteLocal(db: SQLiteDatabase): Local {
         await db.runAsync('UPDATE products SET stock = stock + ? WHERE id = ?', m.delta, m.product_id);
       }
     },
+    async putCustomer(c) {
+      await db.runAsync(
+        `INSERT INTO customers (id, name, phone, deleted, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, phone = excluded.phone,
+           deleted = excluded.deleted, updated_at = excluded.updated_at`,
+        c.id, c.name, c.phone, c.deleted ? 1 : 0, c.updated_at ?? new Date().toISOString(),
+      );
+    },
+    async putKhata(k) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO khata_entries (id, customer_id, amount_paise, note, bill_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        k.id, k.customer_id, k.amount_paise, k.note, k.bill_id, k.created_at,
+      );
+    },
     async putSale(s) {
       await db.runAsync(
         `INSERT OR IGNORE INTO sales (sync_id, bill_id, product_id, qty, sell_paise, amount_paise, sold_at)
@@ -508,6 +658,18 @@ export function useProducts() {
     return subscribeData(refresh);
   }, [refresh]);
   return { db, products, refresh };
+}
+
+/** Customers with their balances, reloaded after a change or a sync. */
+export function useCustomers() {
+  const db = useSQLiteContext();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const refresh = useCallback(async () => setCustomers(await listCustomers(db)), [db]);
+  useEffect(() => {
+    refresh();
+    return subscribeData(refresh);
+  }, [refresh]);
+  return { db, customers, refresh };
 }
 
 /** The shop this phone belongs to and what its user may do. */
