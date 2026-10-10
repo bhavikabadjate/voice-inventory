@@ -50,6 +50,8 @@ export interface ConversationState {
   flow: Flow;
   /** Last bill quoted, so "bill pakka karo" can turn it into a sale. */
   lastBill: Bill | null;
+  /** False for staff who may not see cost prices: the cost question is skipped. */
+  askCost?: boolean;
 }
 
 export const initialState: ConversationState = { lang: 'hi', flow: { step: 'idle' }, lastBill: null };
@@ -254,13 +256,10 @@ function withFlow(state: ConversationState, lang: Lang, flow: Flow): Conversatio
   return { ...state, lang, flow };
 }
 
-function newProductSummary(d: Required<NewProduct>, expiry: string | null, lang: Lang): string {
-  const parts = [
-    d.name,
-    qtyWithUnit(d.qty, d.unit, lang),
-    `${T.cost[lang]} ${formatRupees(d.costPaise)}`,
-    `${T.sell[lang]} ${formatRupees(d.sellPaise)}`,
-  ];
+function newProductSummary(d: Required<NewProduct>, expiry: string | null, lang: Lang, showCost: boolean): string {
+  const parts = [d.name, qtyWithUnit(d.qty, d.unit, lang)];
+  if (showCost) parts.push(`${T.cost[lang]} ${formatRupees(d.costPaise)}`);
+  parts.push(`${T.sell[lang]} ${formatRupees(d.sellPaise)}`);
   if (expiry) parts.push(`${T.expiry[lang]} ${displayDate(expiry)}`);
   return parts.join(sep[lang]);
 }
@@ -274,6 +273,7 @@ function nextNewStep(state: ConversationState, lang: Lang, draft: NewProduct): T
     return turn(withFlow(state, lang, { step: 'newUnit', draft }), lang, T.askUnit[lang]());
   }
   const u = unitLabel(draft.unit, lang);
+  if (draft.costPaise === undefined && state.askCost === false) draft = { ...draft, costPaise: 0 };
   if (draft.costPaise === undefined) {
     return turn(withFlow(state, lang, { step: 'newCost', draft }), lang, T.askCost[lang](u));
   }
@@ -297,7 +297,7 @@ function confirmNewProduct(state: ConversationState, lang: Lang, draft: NewProdu
     },
   };
   return turn(withFlow(state, lang, { step: 'confirm', action }), lang,
-    T.confirmNew[lang](newProductSummary(d, expiry, lang)));
+    T.confirmNew[lang](newProductSummary(d, expiry, lang, state.askCost !== false)));
 }
 
 /** A single product the person named, or what to say if there isn't exactly one. */

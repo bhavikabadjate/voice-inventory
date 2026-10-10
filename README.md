@@ -29,6 +29,11 @@ The product plan lives in the project files (`plans/voice-inventory-plan.md`).
 - **Shop tab**: items expiring within 7 days and items running low (at or below a
   level you set per product, or out of stock). Also by voice: "kya expire hone
   wala hai", "kya khatam ho raha hai". Shop name, phone and UPI ID for bills.
+- **Cloud backup and staff** (Shop tab): the owner signs in with a code sent to
+  their email; the shop's products, stock and sales are then backed up and come
+  back on a new phone. Staff join with the shop's 6-digit code. The owner decides
+  per staff member whether they see cost price and whether they may delete
+  products. Everything still works offline and syncs when the internet is back.
 
 ## Run it
 
@@ -42,16 +47,32 @@ npx expo run:android   # or: npx expo run:ios (macOS with Xcode)
 
 Or build in the cloud with EAS: `npx eas-cli@latest build --profile development`.
 
+## Cloud setup (Supabase, once)
+
+1. In the Supabase SQL editor, run `supabase/migrations/20261010000000_shop_sync.sql`.
+2. Authentication → Sign In / Providers: turn on **Anonymous sign-ins** (staff) and
+   keep **Email** on (owner).
+3. Authentication → Emails: in the **Magic link** and **Confirm signup** templates, include `{{ .Token }}` so the
+   email carries a 6-digit code.
+
+The project URL and publishable key are in `src/config.ts` (or set
+`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`). Never put the
+service_role key in the app.
+
 ## Checks
 
 ```bash
 npm test            # unit tests for pricing, units, names and parsing
 npm run typecheck
+supabase/tests/run.sh   # cloud access rules, against a local Postgres
 ```
 
 ## Code map
 
 - `src/core/` — plain TypeScript, no React: units, spoken numbers, name matching
   across spellings and scripts, pricing and bills, the question parser and answers.
-- `src/data/` — SQLite storage on the phone.
+- `src/core/sync.ts` — how phones sync: outbox, stock as movements, cost only for
+  people allowed to see it.
+- `src/data/` — SQLite storage on the phone, and `cloud.ts` for Supabase.
+- `supabase/` — cloud tables and access rules, with tests.
 - `src/app/` — screens (Expo Router).

@@ -1,23 +1,27 @@
-// Shop tab: what needs attention (expiring and low-stock items) and the shop
-// details printed on bills (name, phone, UPI ID for the payment QR code).
+// Shop tab: what needs attention (expiring and low-stock items), the shop
+// details printed on bills (name, phone, UPI ID for the payment QR code), and
+// cloud backup with staff logins.
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AccountSection } from '@/components/account-section';
 import { Button, Field } from '@/components/ui';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { alertCount, findAlerts } from '@/core/alerts';
 import { emptyShop, type Shop } from '@/core/bill-document';
 import { unitLabel } from '@/core/units';
-import { getShop, saveShop, useProducts } from '@/data/db';
+import { updateShop } from '@/data/cloud';
+import { getShop, subscribeData, useAccount, useProducts } from '@/data/db';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function ShopScreen() {
   const theme = useTheme();
   const { db, products, refresh } = useProducts();
   const [shop, setShop] = useState<Shop>(emptyShop);
+  const { can } = useAccount();
 
   useFocusEffect(
     useCallback(() => {
@@ -25,14 +29,20 @@ export default function ShopScreen() {
       getShop(db).then(setShop);
     }, [db, refresh]),
   );
+  // The owner's changes to shop details reach staff phones with a sync.
+  useEffect(() => subscribeData(() => void getShop(db).then(setShop)), [db]);
 
   const alerts = findAlerts(products, new Date());
   const save = async () => {
     if (shop.upiId && !/^[\w.-]+@[\w.-]+$/.test(shop.upiId.trim())) {
       return Alert.alert('UPI ID should look like name@okaxis');
     }
-    await saveShop(db, shop);
-    Alert.alert('Saved');
+    try {
+      await updateShop(db, shop);
+      Alert.alert('Saved');
+    } catch {
+      Alert.alert('Saved on this phone', 'It will reach staff phones at the next sync.');
+    }
   };
 
   return (
@@ -60,6 +70,8 @@ export default function ShopScreen() {
             </View>
           ))}
 
+{can.isOwner ? (
+            <>
           <Text style={[styles.title, { color: theme.text }]}>Shop details for bills</Text>
           <View style={styles.row}>
             <Field label="Shop name" value={shop.name} onChangeText={(name) => setShop({ ...shop, name })} placeholder="Sharma Kirana Store" />
@@ -78,6 +90,10 @@ export default function ShopScreen() {
             />
           </View>
           <Button title="Save" onPress={save} />
+            </>
+          ) : null}
+
+          <AccountSection />
         </ScrollView>
       </SafeAreaView>
     </View>
