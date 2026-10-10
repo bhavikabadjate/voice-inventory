@@ -398,7 +398,7 @@ const UNIT={};[['litre liter litr ltr l litres lit लीटर लिटर','l
  .forEach(([w,u])=>w.split(' ').forEach(x=>UNIT[key2(x)]=u));
 const W={SELL:K('becha bech bechi beche becho bechdiya sold sell vikla vikli vikle vikale विकले विकली विकला'),STOCK:K('bacha bachi bache stock shillak left remaining urla urli स्टॉक शिल्लक'),
  ADD:K('add aaya aayi aaye jodo jod joda naya new ala aala aale aali navin'),COST:K('liya kharid kharida kharidi cost ghetla'),SELLP:K('bechna bechenge selling mrp vikaycha'),
- RATE:K('rate price bhav daam kimat'),KAR:K('kar karo kara set kardo badal badlo badla change'),BILL:K('bill'),PAKKA:K('pakka confirm final done'),
+ RATE:K('rate price bhav daam kimat'),KAR:K('kar karo kara set kardo badal badlo badla change update'),BILL:K('bill'),PAKKA:K('pakka confirm final done'),
  REMOVE:K('hata hatao hatado remove kadha kadh'),EXPIRE:K('expire expiry expired'),UNDO:K('undo galat galti wapas vapas ulta mistake'),ALIAS:K('bolte kehte mhantat called'),
  KITNA:K('kitna kitne kitni kiti kitila how किती कितीला'),YES:K('haan ha yes ho hoy hoya ok okay theek thik save sahi y kara'),NO:K('nahi nako no cancel mat n nahin'),
  SEP:K('aur and ani plus'),HI:K('kitna kitne kitni kiti ka ki hai karo becha bacha bachi aur hata haan nahi ahe ko mein'),
@@ -1109,6 +1109,10 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
     if(has(W.PROFIT)&&!has(W.KAISE))return hisaab(per||'p')}
   if(has(W.REORDER))return reorder();
   const R=parseItems(toks,has(W.ADD)||has(W.COST)),items=R.items;if(!R.amb)S.prefers=null;
+  /* "price of milk" then "update it to 60": a follow-up with just a number means the product just talked about */
+  let follow=false;{const nums=toks.filter(x=>x.num!==undefined),ref=toks.some(x=>['it','its','this','that','isko','iska','ise','isse','usko','uska','yeh','ye','hyacha','yacha','tyacha'].includes(x.raw.toLowerCase()));
+    if(!items.length&&!R.amb&&mode!=='sales'&&S.lastP&&Date.now()-S.lastP.at<120000&&nums.length===1&&!toks.some(x=>x.unit)&&(ref||has(W.KAR)||has(W.RATE))&&!['STOCK','SELL','ADD','COST','KHATA','JAMA','KITNA'].some(n=>has(W[n]))){const lp=S.products.find(x=>x.id===S.lastP.id);if(lp){items.push({p:lp,qty:nums[0].num});follow=true}}
+    if(items.length===1)S.lastP={id:items[0].p.id,at:Date.now()}}
   if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id)).filter(Boolean),same=ps.every(p=>key(p.name)===key(ps[0].name));S.ambText=text;S.ambIds=ps.map(p=>p.id);
     const chips=ps.map(p=>[`${p.name} · ${fm(p.sell)} · ${fq(p.qty,p.unit)}`,'#pick:'+p.id]);if(same&&canDel())chips.push([t('Ek hi cheez hai, mila do','Same item, merge them'),'#merge',1]);
     return say(same?t(`"${ps[0].name}" naam ke ${ps.length} product hain. Kaunsa?`,`There are ${ps.length} products named "${ps[0].name}". Which one?`):tm('कोणते?','Kaunsa?','Which one?'),chips)}
@@ -1128,7 +1132,7 @@ async function handle(text,fromAI){text=text.trim();if(!text)return;S.lastTalk=D
   if(has(W.ADD)||has(W.COST))return startAdd(toks,R,left);
   if(has(W.REMOVE)&&items.length){S.bill=S.bill.filter(l=>!items.some(i=>i.p.id===l.id));renderBill();return say(t(items[0].p.name+' bill se hata diya.','Removed '+items[0].p.name+' from the bill.'))}
   if(has(W.RATE)&&!items.length&&!toks.some(x=>x.num!==undefined))return say(t('Kis cheez ka rate? Aise bolo: "cheeni ka rate 46 kar do".','Price of what? Say: "change sugar price to 46".'));
-  if(items.length===1&&(items[0].qty!=null||items[0].amt!=null)&&!items[0].unit&&!has(W.STOCK)&&!has(W.SELL)&&!has(W.KITNA)&&mode!=='sales'&&(has(W.RATE)||has(W.KAR))){const p=items[0].p,v=items[0].qty??items[0].amt;
+  if(items.length===1&&(items[0].qty!=null||items[0].amt!=null)&&!items[0].unit&&!has(W.STOCK)&&!has(W.SELL)&&!has(W.KITNA)&&mode!=='sales'&&(has(W.RATE)||has(W.KAR)||follow)){const p=items[0].p,v=items[0].qty??items[0].amt;
     if(!(v>0))return say(t('Rate zero ya usse kam nahi ho sakta.','A price cannot be zero or less.'));
     const odd=p.sell>0&&(v>p.sell*3||v<p.sell/3)?t('Yeh bahut bada badlav hai. ','That is a very big change. '):'';
     return confirmAsk(odd+tm(`${p.name} चा दर ${fm(p.sell)} वरून ${fm(v)} करू का?`,`${p.name} ka rate ${fm(p.sell)} se ${fm(v)} karun?`,`Change ${p.name} from ${fm(p.sell)} to ${fm(v)}?`),()=>{saveProduct({...p,sell:v,history:[...(p.history||[]),{from:p.sell,to:v,at:Date.now()}]});say(tm(`${p.name} आता ${fm(v)} प्रति ${UL[p.unit]}.`,`${p.name} ab ${fm(v)} per ${UL[p.unit]}.`,`${p.name} is now ${fm(v)} per ${UL[p.unit]}.`))})}
