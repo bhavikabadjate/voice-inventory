@@ -8,8 +8,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { confirmAction, notify } from '@/components/notify';
-import { Button, Chip, Field } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
+import { Button, Card, Chip, Field, SectionTitle } from '@/components/ui';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import {
   getSyncState,
   joinAsStaff,
@@ -130,110 +130,119 @@ export function AccountSection() {
       }),
     );
 
-  const muted = { color: theme.textSecondary };
+  const muted = [Type.body, { color: theme.textSecondary }];
 
   if (account.store && account.membership) {
     const m = account.membership;
+    const staff = team.filter((t) => t.role === 'staff');
     return (
       <View style={styles.section}>
-        <Text style={[styles.title, { color: theme.text }]}>Cloud backup and staff</Text>
-        <Text style={{ color: theme.text }}>
-          Signed in as {m.name || (isOwner ? 'owner' : 'staff')} ({isOwner ? 'owner' : 'staff'}).
-        </Text>
-        <Text style={muted}>{syncText(sync)}</Text>
-        {isOwner ? (
-          <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={muted}>Staff join with this shop code</Text>
-            <Text style={[styles.code, { color: theme.text }]}>{account.store.code}</Text>
+        <SectionTitle>Cloud backup and staff</SectionTitle>
+        <Card>
+          <Text style={[Type.bodyStrong, { color: theme.text }]}>
+            Signed in as {m.name || (isOwner ? 'owner' : 'staff')} ({isOwner ? 'owner' : 'staff'})
+          </Text>
+          <Text style={muted}>{syncText(sync)}</Text>
+          {isOwner ? (
+            <View style={[styles.codeBox, { backgroundColor: theme.accentSoft }]}>
+              <Text style={[Type.caption, { color: theme.accent }]}>Staff join with this shop code</Text>
+              <Text style={[styles.code, { color: theme.accent }]}>{account.store.code}</Text>
+            </View>
+          ) : null}
+          <View style={styles.buttons}>
+            <Button style={styles.flex} title="Sync now" kind="secondary" disabled={busy} onPress={() => syncNow(db).then(loadTeam)} />
+            <Button style={styles.flex} title="Sign out" kind="secondary" disabled={busy} onPress={leave} />
           </View>
-        ) : null}
-        <Button title="Sync now" kind="secondary" disabled={busy} onPress={() => syncNow(db).then(loadTeam)} />
+        </Card>
 
         {isOwner ? (
           <>
-            <Text style={[styles.title, { color: theme.text }]}>Team</Text>
-            {team.filter((t) => t.role === 'staff').length === 0 ? (
-              <Text style={muted}>No staff yet. Share the shop code above with them.</Text>
+            <SectionTitle>Team</SectionTitle>
+            {staff.length === 0 ? (
+              <Card>
+                <Text style={muted}>No staff yet. Share the shop code above with them.</Text>
+              </Card>
             ) : null}
-            {team
-              .filter((t) => t.role === 'staff')
-              .map((t) => (
-                <View key={t.user_id} style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-                  <Text style={[styles.member, { color: theme.text }]}>{t.name || 'Staff'}</Text>
-                  <View style={styles.chips}>
-                    <Chip label="Sees cost price" selected={t.can_see_cost} onPress={() => toggle(t, 'can_see_cost')} />
-                    <Chip label="Can delete products" selected={t.can_delete} onPress={() => toggle(t, 'can_delete')} />
-                  </View>
-                  <Button title="Remove" kind="danger" disabled={busy} onPress={() => remove(t)} />
+            {staff.map((t) => (
+              <Card key={t.user_id}>
+                <Text style={[Type.bodyStrong, { color: theme.text }]}>{t.name || 'Staff'}</Text>
+                <View style={styles.chips}>
+                  <Chip label="Sees cost price" selected={t.can_see_cost} onPress={() => toggle(t, 'can_see_cost')} />
+                  <Chip label="Can delete products" selected={t.can_delete} onPress={() => toggle(t, 'can_delete')} />
                 </View>
-              ))}
+                <Button title="Remove" kind="danger" disabled={busy} onPress={() => remove(t)} />
+              </Card>
+            ))}
           </>
         ) : null}
-        <Button title="Sign out" kind="secondary" disabled={busy} onPress={leave} />
       </View>
     );
   }
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.title, { color: theme.text }]}>Cloud backup and staff</Text>
-      <Text style={muted}>
-        Sign in to back up your products and sales, and to let staff use the app on their own phones.
-      </Text>
-      <View style={styles.chips}>
-        <Chip label="I am the owner" selected={mode === 'owner'} onPress={() => setMode('owner')} />
-        <Chip label="I am staff" selected={mode === 'staff'} onPress={() => setMode('staff')} />
-      </View>
-      {mode === 'owner' ? (
-        <>
-          <View style={styles.row}>
-            <Field label="Your name" value={name} onChangeText={setName} placeholder="Ramesh" />
-          </View>
-          <View style={styles.row}>
-            <Field
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              placeholder="ramesh@gmail.com"
-            />
-          </View>
-          {codeSent ? (
-            <>
-              <View style={styles.row}>
-                <Field label="Code from the email" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" />
-              </View>
-              <Button title="Sign in" disabled={busy} onPress={verify} />
-              <Button title="Send the code again" kind="secondary" disabled={busy} onPress={sendCode} />
-            </>
-          ) : (
-            <Button title="Email me a sign-in code" disabled={busy} onPress={sendCode} />
-          )}
-        </>
-      ) : (
-        <>
-          <View style={styles.row}>
-            <Field label="Your name" value={name} onChangeText={setName} placeholder="Suresh" />
-          </View>
-          <View style={styles.row}>
-            <Field label="Shop code (ask the owner)" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" />
-          </View>
-          <Text style={muted}>Joining replaces anything on this phone with the shop's products.</Text>
-          <Button title="Join the shop" disabled={busy} onPress={join} />
-        </>
-      )}
+      <SectionTitle>Cloud backup and staff</SectionTitle>
+      <Card>
+        <Text style={muted}>
+          Sign in to back up your products and sales, and to let staff use the app on their own phones.
+        </Text>
+        <View style={styles.chips}>
+          <Chip label="I am the owner" selected={mode === 'owner'} onPress={() => setMode('owner')} />
+          <Chip label="I am staff" selected={mode === 'staff'} onPress={() => setMode('staff')} />
+        </View>
+        {mode === 'owner' ? (
+          <>
+            <View style={styles.row}>
+              <Field label="Your name" value={name} onChangeText={setName} placeholder="Ramesh" />
+            </View>
+            <View style={styles.row}>
+              <Field
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="ramesh@gmail.com"
+              />
+            </View>
+            {codeSent ? (
+              <>
+                <View style={styles.row}>
+                  <Field label="Code from the email" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" />
+                </View>
+                <Button title="Sign in" disabled={busy} onPress={verify} />
+                <Button title="Send the code again" kind="ghost" disabled={busy} onPress={sendCode} />
+              </>
+            ) : (
+              <Button title="Email me a sign-in code" icon={{ ios: 'envelope.fill', md: 'mail' }} disabled={busy} onPress={sendCode} />
+            )}
+          </>
+        ) : (
+          <>
+            <View style={styles.row}>
+              <Field label="Your name" value={name} onChangeText={setName} placeholder="Suresh" />
+            </View>
+            <View style={styles.row}>
+              <Field label="Shop code (ask the owner)" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" />
+            </View>
+            <Text style={[Type.caption, { color: theme.textSecondary }]}>
+              Joining replaces anything on this phone with the shop's products.
+            </Text>
+            <Button title="Join the shop" disabled={busy} onPress={join} />
+          </>
+        )}
+      </Card>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   section: { gap: Spacing.three },
-  title: { fontSize: 20, fontWeight: '700', marginTop: Spacing.two },
   row: { flexDirection: 'row' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  card: { padding: Spacing.three, borderRadius: 12, gap: Spacing.two },
-  code: { fontSize: 32, fontWeight: '800', letterSpacing: 6 },
-  member: { fontSize: 16, fontWeight: '600' },
+  buttons: { flexDirection: 'row', gap: Spacing.two },
+  codeBox: { padding: Spacing.three, borderRadius: Radius.md, gap: Spacing.one },
+  code: { fontSize: 32, lineHeight: 40, fontWeight: '800', letterSpacing: 6 },
 });

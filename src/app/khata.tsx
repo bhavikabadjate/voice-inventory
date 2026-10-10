@@ -3,21 +3,17 @@
 
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useState, type ReactNode } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Linking, StyleSheet, Text, View } from 'react-native';
 
 import { notify } from '@/components/notify';
-import { Button, Chip, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
+import { Button, Card, Chip, Field, Icon, ListRow, pageContent, Screen, ScreenHeader } from '@/components/ui';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import { formatRupees } from '@/core/billing';
 import { findCustomers, owing, reminderLink, whatsappNumber, type Customer, type KhataEntry } from '@/core/khata';
 import type { Lang } from '@/core/units';
-import { addKhataEntry, customerEntries, getShop, saveCustomer, useCustomers } from '@/data/db';
+import { addKhataEntry, customerEntries, getShop, saveCustomer, subscribeData, useCustomers } from '@/data/db';
 import { useTheme } from '@/hooks/use-theme';
-
-const RED = '#D93F3F';
-const GREEN = '#2E9E5B';
 
 function toPaise(text: string): number {
   return Math.round(Number(text.replace(/[^\d.]/g, '')) * 100);
@@ -65,60 +61,71 @@ export default function KhataScreen() {
   }
 
   if (current) {
-    return (
-      <Screen>
-        <CustomerKhata customer={current} onBack={() => setView({ kind: 'list' })} onChanged={refresh} />
-      </Screen>
-    );
+    return <CustomerKhata customer={current} onBack={() => setView({ kind: 'list' })} onChanged={refresh} />;
   }
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Khata</Text>
-        <Text style={{ color: theme.textSecondary }}>
-          {totalDue > 0 ? `${due.length} customers owe ${formatRupees(totalDue)}` : 'Nobody owes anything.'}
-        </Text>
-        <View style={styles.row}>
-          <Field label="Search a customer" value={search} onChangeText={setSearch} placeholder="Ramesh" />
-        </View>
-        <Button title="+ Add customer" onPress={() => setView({ kind: 'new' })} />
-      </View>
+    <Screen scroll={false}>
       <FlatList
         data={shown}
         keyExtractor={(c) => c.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[pageContent, styles.list]}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <ScreenHeader
+              title="Khata"
+              right={<Button title="Add" icon={{ ios: 'person.badge.plus', md: 'person_add' }} onPress={() => setView({ kind: 'new' })} />}
+            />
+            <Card style={styles.summary}>
+              <View style={[styles.summaryIcon, { backgroundColor: totalDue > 0 ? theme.dangerSoft : theme.accentSoft }]}>
+                <Icon
+                  name={{ ios: 'book.closed.fill', md: 'menu_book' }}
+                  size={22}
+                  color={totalDue > 0 ? theme.danger : theme.accent}
+                />
+              </View>
+              <View style={styles.flex}>
+                <Text style={[Type.caption, { color: theme.textSecondary }]}>
+                  {totalDue > 0 ? `${due.length} ${due.length === 1 ? 'customer owes' : 'customers owe'}` : 'Udhaar'}
+                </Text>
+                <Text style={[styles.big, { color: totalDue > 0 ? theme.danger : theme.text }]}>
+                  {totalDue > 0 ? formatRupees(totalDue) : 'Nobody owes anything'}
+                </Text>
+              </View>
+            </Card>
+            <View style={styles.row}>
+              <Field label="Search a customer" value={search} onChangeText={setSearch} placeholder="Ramesh" />
+            </View>
+          </View>
+        }
         ListEmptyComponent={
-          <Text style={[styles.empty, { color: theme.textSecondary }]}>
+          <Text style={[Type.body, styles.empty, { color: theme.textSecondary }]}>
             {customers.length
               ? `Nobody called “${search}”.`
               : 'No customers yet. Add one here, or say "Ramesh ke khate mein 200 likho" on the Ask tab.'}
           </Text>
         }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => setView({ kind: 'customer', id: item.id })}
-            style={({ pressed }) => [styles.item, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.7 : 1 }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.phone || ' '}</Text>
+        renderItem={({ item, index }) => (
+          <ListRow first={index === 0} last={index === shown.length - 1} onPress={() => setView({ kind: 'customer', id: item.id })}>
+            <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
+              <Text style={[Type.bodyStrong, { color: theme.textSecondary }]}>{item.name.trim().charAt(0).toUpperCase()}</Text>
             </View>
-            <Text style={[styles.amount, { color: item.balancePaise > 0 ? RED : theme.textSecondary }]}>
+            <View style={styles.flex}>
+              <Text style={[Type.bodyStrong, { color: theme.text }]}>{item.name}</Text>
+              {item.phone ? <Text style={[Type.caption, { color: theme.textSecondary }]}>{item.phone}</Text> : null}
+            </View>
+            <Text
+              style={[
+                Type.bodyStrong,
+                { color: item.balancePaise > 0 ? theme.danger : item.balancePaise < 0 ? theme.accent : theme.textSecondary },
+              ]}>
               {item.balancePaise > 0 ? formatRupees(item.balancePaise) : item.balancePaise < 0 ? `Advance ${formatRupees(-item.balancePaise)}` : '—'}
             </Text>
-          </Pressable>
+          </ListRow>
         )}
       />
     </Screen>
-  );
-}
-
-function Screen({ children }: { children: ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>{children}</SafeAreaView>
-    </View>
   );
 }
 
@@ -131,7 +138,6 @@ function CustomerForm({
   onSave: (name: string, phone: string) => Promise<void>;
   onCancel: () => void;
 }) {
-  const theme = useTheme();
   const [name, setName] = useState(initial?.name ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const save = () => {
@@ -140,17 +146,21 @@ function CustomerForm({
     onSave(name, phone);
   };
   return (
-    <View style={styles.form}>
-      <Text style={[styles.title, { color: theme.text }]}>{initial ? 'Edit customer' : 'New customer'}</Text>
+    <>
+      <ScreenHeader title={initial ? 'Edit customer' : 'New customer'} />
+      <Card>
+        <View style={styles.row}>
+          <Field label="Name" value={name} onChangeText={setName} placeholder="Ramesh Patil" autoFocus={!initial} />
+        </View>
+        <View style={styles.row}>
+          <Field label="Mobile (for WhatsApp reminders)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="98765 43210" />
+        </View>
+      </Card>
       <View style={styles.row}>
-        <Field label="Name" value={name} onChangeText={setName} placeholder="Ramesh Patil" autoFocus={!initial} />
+        <Button style={styles.flex} title="Cancel" kind="secondary" onPress={onCancel} />
+        <Button style={styles.flex} title="Save" onPress={save} />
       </View>
-      <View style={styles.row}>
-        <Field label="Mobile (for WhatsApp reminders)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="98765 43210" />
-      </View>
-      <Button title="Save" onPress={save} />
-      <Button title="Cancel" kind="secondary" onPress={onCancel} />
-    </View>
+    </>
   );
 }
 
@@ -177,6 +187,8 @@ function CustomerKhata({
       load();
     }, [load]),
   );
+  // Udhaar written by voice on the Ask tab shows up here straight away.
+  useEffect(() => subscribeData(() => void load()), [load]);
 
   const write = async (sign: 1 | -1) => {
     const paise = toPaise(amount);
@@ -196,97 +208,98 @@ function CustomerKhata({
 
   if (editing) {
     return (
-      <CustomerForm
-        initial={customer}
-        onCancel={() => setEditing(false)}
-        onSave={async (name, phone) => {
-          await saveCustomer(db, { id: customer.id, name, phone });
-          await onChanged();
-          setEditing(false);
-        }}
-      />
+      <Screen>
+        <CustomerForm
+          initial={customer}
+          onCancel={() => setEditing(false)}
+          onSave={async (name, phone) => {
+            await saveCustomer(db, { id: customer.id, name, phone });
+            await onChanged();
+            setEditing(false);
+          }}
+        />
+      </Screen>
     );
   }
 
   const balance = customer.balancePaise;
   return (
-    <FlatList
-      data={entries}
-      keyExtractor={(e) => e.id}
-      contentContainerStyle={styles.list}
-      ListHeaderComponent={
-        <View style={styles.detailHeader}>
-          <View style={styles.topRow}>
-            <Button title="‹ Back" kind="secondary" onPress={onBack} />
-            <Button title="Edit" kind="secondary" onPress={() => setEditing(true)} />
-          </View>
-          <Text style={[styles.title, { color: theme.text }]}>{customer.name}</Text>
-          {customer.phone ? <Text style={{ color: theme.textSecondary }}>{customer.phone}</Text> : null}
-          <Text style={[styles.balance, { color: balance > 0 ? RED : balance < 0 ? GREEN : theme.text }]}>
-            {balance > 0 ? `Owes ${formatRupees(balance)}` : balance < 0 ? `Advance ${formatRupees(-balance)}` : 'Nothing due'}
-          </Text>
-
-          <View style={styles.row}>
-            <Field label="Amount ₹" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="200" />
-            <Field label="Note (optional)" value={note} onChangeText={setNote} placeholder="Atta, oil" />
-          </View>
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Button title="Gave udhaar" kind="danger" onPress={() => write(1)} />
+    <Screen scroll={false}>
+      <FlatList
+        data={entries}
+        keyExtractor={(e) => e.id}
+        contentContainerStyle={[pageContent, styles.list]}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View style={styles.topRow}>
+              <Button title="Khata" kind="ghost" icon={{ ios: 'chevron.left', md: 'chevron_left' }} onPress={onBack} />
+              <Button title="Edit" kind="ghost" icon={{ ios: 'pencil', md: 'edit' }} onPress={() => setEditing(true)} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Button title="Got payment" onPress={() => write(-1)} />
-            </View>
-          </View>
-
-          {balance > 0 ? (
-            <>
-              <View style={styles.chips}>
-                <Chip label="हिंदी" selected={lang === 'hi'} onPress={() => setLang('hi')} />
-                <Chip label="मराठी" selected={lang === 'mr'} onPress={() => setLang('mr')} />
-                <Chip label="English" selected={lang === 'en'} onPress={() => setLang('en')} />
+            <ScreenHeader title={customer.name} subtitle={customer.phone || undefined} />
+            <Card>
+              <Text style={[Type.caption, { color: theme.textSecondary }]}>
+                {balance > 0 ? 'Owes you' : balance < 0 ? 'Advance paid' : 'Balance'}
+              </Text>
+              <Text style={[styles.balance, { color: balance > 0 ? theme.danger : balance < 0 ? theme.accent : theme.text }]}>
+                {balance === 0 ? 'Nothing due' : formatRupees(Math.abs(balance))}
+              </Text>
+              <View style={styles.row}>
+                <Field label="Amount ₹" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="200" />
+                <Field label="Note (optional)" value={note} onChangeText={setNote} placeholder="Atta, oil" />
               </View>
-              <Button title="Send reminder on WhatsApp" kind="secondary" onPress={remind} />
-            </>
-          ) : null}
-          <Text style={[styles.subtitle, { color: theme.text }]}>History</Text>
-          {entries.length === 0 ? <Text style={{ color: theme.textSecondary }}>No entries yet.</Text> : null}
-        </View>
-      }
-      renderItem={({ item }) => (
-        <View style={[styles.item, { backgroundColor: theme.backgroundElement }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '600' }}>
-              {item.amountPaise > 0 ? 'Udhaar' : 'Payment'}
-              {item.note ? ` · ${item.note}` : ''}
-            </Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{when(item.at)}</Text>
+              <View style={styles.row}>
+                <Button style={styles.flex} title="Gave udhaar" kind="danger" icon={{ ios: 'arrow.up.right', md: 'north_east' }} onPress={() => write(1)} />
+                <Button style={styles.flex} title="Got payment" icon={{ ios: 'arrow.down.left', md: 'south_west' }} onPress={() => write(-1)} />
+              </View>
+            </Card>
+
+            {balance > 0 ? (
+              <Card>
+                <Text style={[Type.bodyStrong, { color: theme.text }]}>Remind on WhatsApp</Text>
+                <View style={styles.chips}>
+                  <Chip label="हिंदी" selected={lang === 'hi'} onPress={() => setLang('hi')} />
+                  <Chip label="मराठी" selected={lang === 'mr'} onPress={() => setLang('mr')} />
+                  <Chip label="English" selected={lang === 'en'} onPress={() => setLang('en')} />
+                </View>
+                <Button title="Send reminder" kind="secondary" icon={{ ios: 'paperplane.fill', md: 'send' }} onPress={remind} />
+              </Card>
+            ) : null}
+            <Text style={[Type.section, { color: theme.text }]}>History</Text>
+            {entries.length === 0 ? <Text style={[Type.body, { color: theme.textSecondary }]}>No entries yet.</Text> : null}
           </View>
-          <Text style={[styles.amount, { color: item.amountPaise > 0 ? RED : GREEN }]}>
-            {item.amountPaise > 0 ? '+' : '−'}
-            {formatRupees(Math.abs(item.amountPaise))}
-          </Text>
-        </View>
-      )}
-    />
+        }
+        renderItem={({ item, index }) => (
+          <ListRow first={index === 0} last={index === entries.length - 1}>
+            <View style={styles.flex}>
+              <Text style={[Type.bodyStrong, { color: theme.text }]}>
+                {item.amountPaise > 0 ? 'Udhaar' : 'Payment'}
+                {item.note ? ` · ${item.note}` : ''}
+              </Text>
+              <Text style={[Type.caption, { color: theme.textSecondary }]}>{when(item.at)}</Text>
+            </View>
+            <Text style={[Type.bodyStrong, { color: item.amountPaise > 0 ? theme.danger : theme.accent }]}>
+              {item.amountPaise > 0 ? '+' : '−'}
+              {formatRupees(Math.abs(item.amountPaise))}
+            </Text>
+          </ListRow>
+        )}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
-  header: { padding: Spacing.three, gap: Spacing.three },
-  detailHeader: { gap: Spacing.three, paddingTop: Spacing.three, paddingBottom: Spacing.two },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  form: { padding: Spacing.four, gap: Spacing.three },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { fontSize: 18, fontWeight: '700', marginTop: Spacing.two },
-  balance: { fontSize: 28, fontWeight: '800' },
+  flex: { flex: 1 },
+  header: { gap: Spacing.three, marginBottom: Spacing.three },
+  list: { gap: 0 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -Spacing.three, marginTop: -Spacing.three },
   row: { flexDirection: 'row', gap: Spacing.three },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  list: { paddingHorizontal: Spacing.three, paddingBottom: BottomTabInset + Spacing.four, gap: Spacing.two },
-  empty: { textAlign: 'center', fontSize: 15, paddingTop: Spacing.four },
-  item: { flexDirection: 'row', alignItems: 'center', padding: Spacing.three, borderRadius: 12, gap: Spacing.two },
-  itemName: { fontSize: 17, fontWeight: '700' },
-  amount: { fontSize: 17, fontWeight: '700' },
+  summary: { flexDirection: 'row', alignItems: 'center' },
+  summaryIcon: { width: 44, height: 44, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  big: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
+  balance: { fontSize: 32, lineHeight: 38, fontWeight: '800' },
+  avatar: { width: 36, height: 36, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  empty: { textAlign: 'center', paddingTop: Spacing.three },
 });

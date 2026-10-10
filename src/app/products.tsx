@@ -2,12 +2,12 @@
 // cost and selling price, stock and an optional expiry date.
 
 import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { confirmAction, notify } from '@/components/notify';
-import { Button, Chip, Field } from '@/components/ui';
-import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
+import { Button, Card, Chip, Field, ListRow, pageContent, Screen, ScreenHeader } from '@/components/ui';
+import { Radius, Spacing, Type } from '@/constants/theme';
+import { isLowStock } from '@/core/alerts';
 import { formatRupees, type Product } from '@/core/billing';
 import { findProducts } from '@/core/names';
 import { unitLabel, type Unit } from '@/core/units';
@@ -104,122 +104,131 @@ export default function ProductsScreen() {
   if (draft) {
     const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.form}>
-            <Text style={[styles.title, { color: theme.text }]}>
-              {draft.id ? 'Edit product' : 'New product'}
-            </Text>
-            <View style={styles.row}>
-              <Field
-                label="Names (comma separated, any language)"
-                value={draft.names}
-                onChangeText={(names) => set({ names })}
-                placeholder="Milk, dudh, दूध"
-                autoFocus={!draft.id}
-              />
-            </View>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>Sold per</Text>
-            <View style={styles.chips}>
-              {UNITS.map((u) => (
-                <Chip key={u.unit} label={u.label} selected={draft.unit === u.unit} onPress={() => set({ unit: u.unit })} />
-              ))}
-            </View>
-            <View style={styles.row}>
-              <Field label="Selling price ₹" value={draft.sell} onChangeText={(sell) => set({ sell })} keyboardType="decimal-pad" placeholder="56" />
-              {can.canSeeCost ? (
-                <Field label="Cost price ₹ (never spoken)" value={draft.cost} onChangeText={(cost) => set({ cost })} keyboardType="decimal-pad" placeholder="48" />
-              ) : null}
-            </View>
-            <View style={styles.row}>
-              <Field label={`Stock (${unitLabel(draft.unit)})`} value={draft.stock} onChangeText={(stock) => set({ stock })} keyboardType="decimal-pad" placeholder="20" />
-              <Field label="Expiry (optional)" value={draft.expiry} onChangeText={(expiry) => set({ expiry })} placeholder="2026-10-31" />
-            </View>
-            <View style={styles.row}>
-              <Field
-                label={`Warn when stock is at or below (${unitLabel(draft.unit)}, optional)`}
-                value={draft.lowAt}
-                onChangeText={(lowAt) => set({ lowAt })}
-                keyboardType="decimal-pad"
-                placeholder="5"
-              />
-            </View>
-            <Button title="Save" onPress={save} />
-            <Button title="Cancel" kind="secondary" onPress={() => setDraft(null)} />
-            {draft.id && can.canDelete ? <Button title="Delete" kind="danger" onPress={remove} /> : null}
+      <Screen>
+        <ScreenHeader title={draft.id ? 'Edit product' : 'New product'} />
+        <Card>
+          <View style={styles.row}>
+            <Field
+              label="Names (comma separated, any language)"
+              value={draft.names}
+              onChangeText={(names) => set({ names })}
+              placeholder="Milk, dudh, दूध"
+              autoFocus={!draft.id}
+            />
           </View>
-        </SafeAreaView>
-      </View>
+          <Text style={[Type.caption, { color: theme.textSecondary }]}>Sold per</Text>
+          <View style={styles.chips}>
+            {UNITS.map((u) => (
+              <Chip key={u.unit} label={u.label} selected={draft.unit === u.unit} onPress={() => set({ unit: u.unit })} />
+            ))}
+          </View>
+          <View style={styles.row}>
+            <Field label="Selling price ₹" value={draft.sell} onChangeText={(sell) => set({ sell })} keyboardType="decimal-pad" placeholder="56" />
+            {can.canSeeCost ? (
+              <Field label="Cost price ₹ (never spoken)" value={draft.cost} onChangeText={(cost) => set({ cost })} keyboardType="decimal-pad" placeholder="48" />
+            ) : null}
+          </View>
+          <View style={styles.row}>
+            <Field label={`Stock (${unitLabel(draft.unit)})`} value={draft.stock} onChangeText={(stock) => set({ stock })} keyboardType="decimal-pad" placeholder="20" />
+            <Field label="Expiry (optional)" value={draft.expiry} onChangeText={(expiry) => set({ expiry })} placeholder="2026-10-31" />
+          </View>
+          <View style={styles.row}>
+            <Field
+              label={`Warn when stock is at or below (${unitLabel(draft.unit)}, optional)`}
+              value={draft.lowAt}
+              onChangeText={(lowAt) => set({ lowAt })}
+              keyboardType="decimal-pad"
+              placeholder="5"
+            />
+          </View>
+        </Card>
+        <View style={styles.row}>
+          <Button style={styles.flex} title="Cancel" kind="secondary" onPress={() => setDraft(null)} />
+          <Button style={styles.flex} title="Save" onPress={save} />
+        </View>
+        {draft.id && can.canDelete ? (
+          <Button title="Delete product" kind="danger" icon={{ ios: 'trash', md: 'delete' }} onPress={remove} />
+        ) : null}
+      </Screen>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <View style={styles.row}>
-            <Field label="Search any name" value={search} onChangeText={setSearch} placeholder="dudh, cheeni…" />
+    <Screen scroll={false}>
+      <FlatList
+        data={shown}
+        keyExtractor={(p) => p.id}
+        contentContainerStyle={[pageContent, styles.list]}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <ScreenHeader
+              title="Products"
+              subtitle={products.length ? `${products.length} items` : undefined}
+              right={<Button title="Add" icon={{ ios: 'plus', md: 'add' }} onPress={() => setDraft(EMPTY)} />}
+            />
+            <View style={styles.row}>
+              <Field label="Search any name" value={search} onChangeText={setSearch} placeholder="dudh, cheeni…" />
+            </View>
           </View>
-          <Button title="+ Add product" onPress={() => setDraft(EMPTY)} />
-        </View>
-        <FlatList
-          data={shown}
-          keyExtractor={(p) => p.id}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            products.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                  No products yet. Add your own, or start with a few sample items to try the voice questions.
-                </Text>
-                <Button title="Add sample items" kind="secondary" onPress={addSamples} />
-              </View>
-            ) : (
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Nothing matches “{search}”.</Text>
-            )
-          }
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => setDraft(toDraft(item))}
-              style={({ pressed }) => [styles.item, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.7 : 1 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemName, { color: theme.text }]}>{item.names[0]}</Text>
-                <Text style={[styles.itemSub, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {item.names.slice(1).join(', ') || ' '}
-                </Text>
+        }
+        ListEmptyComponent={
+          products.length === 0 ? (
+            <Card style={styles.empty}>
+              <Text style={[Type.body, styles.center, { color: theme.textSecondary }]}>
+                No products yet. Add your own, or start with a few sample items to try the voice questions.
+              </Text>
+              <Button title="Add sample items" kind="secondary" onPress={addSamples} />
+            </Card>
+          ) : (
+            <Text style={[Type.body, styles.center, { color: theme.textSecondary }]}>Nothing matches “{search}”.</Text>
+          )
+        }
+        renderItem={({ item, index }) => {
+          const low = isLowStock(item);
+          return (
+            <ListRow first={index === 0} last={index === shown.length - 1} onPress={() => setDraft(toDraft(item))}>
+              <View style={styles.flex}>
+                <Text style={[Type.bodyStrong, { color: theme.text }]}>{item.names[0]}</Text>
+                {item.names.length > 1 ? (
+                  <Text style={[Type.caption, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {item.names.slice(1).join(', ')}
+                  </Text>
+                ) : null}
               </View>
               <View style={styles.itemRight}>
-                <Text style={[styles.itemPrice, { color: theme.text }]}>
-                  {formatRupees(item.sellPaise)} / {unitLabel(item.unit)}
+                <Text style={[Type.bodyStrong, { color: theme.text }]}>
+                  {formatRupees(item.sellPaise)}
+                  <Text style={[Type.caption, { color: theme.textSecondary }]}> / {unitLabel(item.unit)}</Text>
                 </Text>
-                <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Stock {item.stock}
-                  {can.canSeeCost ? ` · Cost ${formatRupees(item.costPaise)}` : ''}
-                </Text>
+                <View style={styles.badges}>
+                  {can.canSeeCost ? (
+                    <Text style={[Type.caption, { color: theme.textSecondary }]}>Cost {formatRupees(item.costPaise)}</Text>
+                  ) : null}
+                  <View style={[styles.badge, { backgroundColor: low ? theme.warningSoft : theme.backgroundElement }]}>
+                    <Text style={[Type.caption, { color: low ? theme.warning : theme.textSecondary }]}>
+                      Stock {item.stock}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </Pressable>
-          )}
-        />
-      </SafeAreaView>
-    </View>
+            </ListRow>
+          );
+        }}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  safeArea: { flex: 1, maxWidth: MaxContentWidth, paddingTop: TopTabInset },
-  header: { padding: Spacing.three, gap: Spacing.three },
-  form: { padding: Spacing.four, gap: Spacing.three },
-  title: { fontSize: 24, fontWeight: '700' },
-  label: { fontSize: 13, fontWeight: '600' },
+  flex: { flex: 1 },
+  center: { textAlign: 'center' },
+  header: { gap: Spacing.three, marginBottom: Spacing.three },
   row: { flexDirection: 'row', gap: Spacing.three },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  list: { paddingHorizontal: Spacing.three, paddingBottom: BottomTabInset + Spacing.four, gap: Spacing.two },
-  empty: { gap: Spacing.three, paddingTop: Spacing.four },
-  emptyText: { textAlign: 'center', fontSize: 15 },
-  item: { flexDirection: 'row', padding: Spacing.three, borderRadius: 12, gap: Spacing.two },
-  itemName: { fontSize: 17, fontWeight: '700' },
-  itemSub: { fontSize: 13 },
-  itemRight: { alignItems: 'flex-end', justifyContent: 'center' },
-  itemPrice: { fontSize: 16, fontWeight: '600' },
+  list: { gap: 0 },
+  empty: { alignItems: 'stretch' },
+  itemRight: { alignItems: 'flex-end', gap: 4 },
+  badges: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full },
 });

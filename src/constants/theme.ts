@@ -9,18 +9,38 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#1C1B18',
+    textSecondary: '#6B675F',
+    placeholder: '#A9A49A',
+    background: '#F6F4EF',
+    surface: '#FFFFFF',
+    backgroundElement: '#EFECE5',
+    backgroundSelected: '#E4E0D6',
+    border: '#E3DFD5',
+    accent: '#0F7A55',
+    accentSoft: '#E2F2EA',
+    onAccent: '#FFFFFF',
+    danger: '#C93A31',
+    dangerSoft: '#FBE9E7',
+    warning: '#A85F00',
+    warningSoft: '#FDF1DC',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#F3F2EE',
+    textSecondary: '#A9A69E',
+    placeholder: '#6E6B64',
+    background: '#121311',
+    surface: '#1C1E1B',
+    backgroundElement: '#262925',
+    backgroundSelected: '#30342F',
+    border: '#2E322D',
+    accent: '#3DC48F',
+    accentSoft: '#173527',
+    onAccent: '#08130D',
+    danger: '#F0776E',
+    dangerSoft: '#3A1D1A',
+    warning: '#F2B45A',
+    warningSoft: '#3A2C14',
   },
 } as const;
 
@@ -61,7 +81,16 @@ export const Spacing = {
   six: 64,
 } as const;
 
+export const Radius = { sm: 8, md: 12, lg: 16, full: 999 } as const;
+
+/** Named text styles, so screens never pick font sizes of their own. */
+export const Type = {
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
+  section: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
+  body: { fontSize: 16, lineHeight: 22, fontWeight: '400' },
+  bodyStrong: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+} as const;
+
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-/** In a browser the tabs sit at the top of the page, over the screen. */
-export const TopTabInset = Platform.select({ web: 72 }) ?? 0;
-export const MaxContentWidth = 800;
+export const MaxContentWidth = 720;
