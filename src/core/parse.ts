@@ -26,6 +26,7 @@ export type Command =
   | { kind: 'setPrice'; lang: Lang; name: string; rupees: number }
   | { kind: 'stock'; lang: Lang; name: string }
   | { kind: 'confirmBill'; lang: Lang }
+  | { kind: 'alerts'; lang: Lang; which: 'expiry' | 'low' | 'all' }
   | { kind: 'yes'; lang: Lang }
   | { kind: 'no'; lang: Lang }
   | { kind: 'unknown'; lang: Lang; text: string };
@@ -76,6 +77,11 @@ const YES_WORDS = new Set([
 ]);
 const NO_WORDS = new Set(['nahi', 'nahin', 'nai', 'na', 'no', 'nope', 'nako', 'cancel', 'नहीं', 'नही', 'ना', 'नाही', 'नको']);
 const FILLERS = new Set(['hai', 'ji', 'bhai', 'karo', 'kar', 'do', 'है', 'जी', 'करो', 'please', 'it', 'is']);
+const EXPIRY_WORDS = new Set(['expire', 'expiry', 'expired', 'expiring', 'एक्सपायर', 'एक्सपायरी', 'kharab', 'खराब']);
+const RUNNING_OUT_WORDS = new Set([
+  'khatam', 'khatm', 'khtam', 'low', 'running', 'out', 'sampat', 'sampla', 'samplay', 'खत्म', 'ख़त्म', 'संपत', 'संपले', 'संपलं',
+]);
+const ALERT_WORDS = new Set(['alert', 'alerts', 'warning', 'warnings', 'अलर्ट']);
 const BILL_WORDS = new Set(['bill', 'बिल']);
 const FINALISE_WORDS = new Set(['pakka', 'confirm', 'save', 'final', 'bana', 'banao', 'पक्का', 'बनाओ', 'बनवा']);
 
@@ -160,6 +166,13 @@ export function parseCommand(text: string): Command {
   }
 
   if (has(tokens, BILL_WORDS) && has(tokens, FINALISE_WORDS)) return { kind: 'confirmBill', lang };
+
+  // "Kya expire hone wala hai?", "kya khatam ho raha hai?", "alerts"
+  const expiry = has(tokens, EXPIRY_WORDS);
+  const low = has(tokens, RUNNING_OUT_WORDS);
+  if (expiry || low || has(tokens, ALERT_WORDS)) {
+    return { kind: 'alerts', lang, which: expiry && !low ? 'expiry' : low && !expiry ? 'low' : 'all' };
+  }
 
   if (has(tokens, STOCK_WORDS) && !has(tokens, RESTOCK_WORDS)) {
     const item = parseItem(tokens.filter((t) => !STOCK_WORDS.has(t) && !ACTION_FILLERS.has(t)));

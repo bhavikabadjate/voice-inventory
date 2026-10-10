@@ -11,6 +11,7 @@
 //
 // Cost price is only ever spoken back while the shopkeeper is entering it.
 
+import { findAlerts } from './alerts';
 import { answer, qtyText, resolve, unknownAnswer } from './assistant';
 import { Bill, BillLine, formatRupees, makeBill, Product } from './billing';
 import { findProducts } from './names';
@@ -153,6 +154,30 @@ const T = {
     en: (n: string) => `How much ${n}?`,
     hi: (n: string) => `कितना ${n}?`,
     mr: (n: string) => `किती ${n}?`,
+  },
+};
+
+const A = {
+  expiring: {
+    en: (l: string) => `Expiring soon: ${l}.`,
+    hi: (l: string) => `जल्दी एक्सपायर होने वाले: ${l}।`,
+    mr: (l: string) => `लवकर एक्सपायर होणारे: ${l}.`,
+  },
+  expiredTag: { en: 'expired', hi: 'एक्सपायर हो गया', mr: 'एक्सपायर झालं' },
+  daysTag: {
+    en: (d: number) => (d === 0 ? 'today' : `${d} days`),
+    hi: (d: number) => (d === 0 ? 'आज' : `${d} दिन`),
+    mr: (d: number) => (d === 0 ? 'आज' : `${d} दिवस`),
+  },
+  low: {
+    en: (l: string) => `Running low: ${l}.`,
+    hi: (l: string) => `खत्म होने वाले: ${l}।`,
+    mr: (l: string) => `संपत आलेले: ${l}.`,
+  },
+  allGood: {
+    en: 'Nothing is expiring or running low.',
+    hi: 'कुछ भी एक्सपायर या खत्म होने वाला नहीं है।',
+    mr: 'काहीही एक्सपायर किंवा संपत आलेलं नाही.',
   },
 };
 
@@ -373,7 +398,7 @@ function startSell(state: ConversationState, lang: Lang, items: ItemRequest[], p
   return confirmSale(state, lang, lines);
 }
 
-function startCommand(command: Command, state: ConversationState, products: Product[]): Turn {
+function startCommand(command: Command, state: ConversationState, products: Product[], today: Date): Turn {
   const { lang } = command;
   switch (command.kind) {
     case 'price': {
@@ -407,9 +432,26 @@ function startCommand(command: Command, state: ConversationState, products: Prod
       const p = pick.product;
       return turn(idle(state, lang), lang, T.stock[lang](p.names[0], qtyWithUnit(p.stock, p.unit, lang)));
     }
+    case 'alerts':
+      return turn(idle(state, lang), lang, alertsText(command.which, products, lang, today));
     default:
       return turn(idle(state, lang), lang, unknownAnswer(lang).text);
   }
+}
+
+function alertsText(which: 'expiry' | 'low' | 'all', products: Product[], lang: Lang, today: Date): string {
+  const { expiring, lowStock } = findAlerts(products, today);
+  const parts: string[] = [];
+  if (which !== 'low' && expiring.length) {
+    const list = expiring.map((a) =>
+      `${a.product.names[0]} (${a.daysLeft < 0 ? A.expiredTag[lang] : A.daysTag[lang](a.daysLeft)})`);
+    parts.push(A.expiring[lang](list.join(sep[lang])));
+  }
+  if (which !== 'expiry' && lowStock.length) {
+    const list = lowStock.map((p) => `${p.names[0]} ${qtyWithUnit(Math.max(p.stock, 0), p.unit, lang)}`);
+    parts.push(A.low[lang](list.join(sep[lang])));
+  }
+  return parts.length ? parts.join(' ') : A.allGood[lang];
 }
 
 /** Handle one thing the shopkeeper said. `today` is only used for expiry dates. */
@@ -428,7 +470,7 @@ export function converse(
 
   switch (flow.step) {
     case 'idle':
-      return startCommand(command, state, products);
+      return startCommand(command, state, products, today);
 
     case 'confirm':
       if (command.kind === 'yes') {
@@ -439,7 +481,7 @@ export function converse(
       if (command.kind === 'no') return cancel();
       if (command.kind === 'unknown') return turn(state, lang, T.yesOrNo[lang]);
       // Something new: drop the pending change and handle it.
-      return startCommand(command, { ...state, flow: { step: 'idle' } }, products);
+      return startCommand(command, { ...state, flow: { step: 'idle' } }, products, today);
 
     case 'newQty': {
       if (command.kind === 'no') return cancel();
@@ -525,7 +567,7 @@ export function billToSale(bill: Bill): Action {
 
 /** The "Confirm sale" button: same as saying "bill pakka karo". */
 export function confirmLastBill(state: ConversationState, products: Product[]): Turn {
-  return startCommand({ kind: 'confirmBill', lang: state.lang }, state, products);
+  return startCommand({ kind: 'confirmBill', lang: state.lang }, state, products, new Date());
 }
 
 /** True while the app is waiting for a yes or no. */

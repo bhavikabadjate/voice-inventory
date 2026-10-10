@@ -32,9 +32,10 @@ interface Draft {
   cost: string;
   stock: string;
   expiry: string;
+  lowAt: string;
 }
 
-const EMPTY: Draft = { id: null, names: '', unit: 'kg', sell: '', cost: '', stock: '', expiry: '' };
+const EMPTY: Draft = { id: null, names: '', unit: 'kg', sell: '', cost: '', stock: '', expiry: '', lowAt: '' };
 
 function toDraft(p: Product): Draft {
   return {
@@ -45,6 +46,7 @@ function toDraft(p: Product): Draft {
     cost: String(p.costPaise / 100),
     stock: String(p.stock),
     expiry: p.expiry ?? '',
+    lowAt: p.lowStockAt !== undefined ? String(p.lowStockAt) : '',
   };
 }
 
@@ -76,6 +78,7 @@ export default function ProductsScreen() {
       costPaise: draft.cost.trim() ? toPaise(draft.cost) : 0,
       stock: Number(draft.stock) || 0,
       expiry: draft.expiry || undefined,
+      lowStockAt: draft.lowAt.trim() ? Number(draft.lowAt) || 0 : undefined,
     });
     setDraft(null);
     refresh();
@@ -134,6 +137,15 @@ export default function ProductsScreen() {
             <View style={styles.row}>
               <Field label={`Stock (${unitLabel(draft.unit)})`} value={draft.stock} onChangeText={(stock) => set({ stock })} keyboardType="decimal-pad" placeholder="20" />
               <Field label="Expiry (optional)" value={draft.expiry} onChangeText={(expiry) => set({ expiry })} placeholder="2026-10-31" />
+            </View>
+            <View style={styles.row}>
+              <Field
+                label={`Warn when stock is at or below (${unitLabel(draft.unit)}, optional)`}
+                value={draft.lowAt}
+                onChangeText={(lowAt) => set({ lowAt })}
+                keyboardType="decimal-pad"
+                placeholder="5"
+              />
             </View>
             <Button title="Save" onPress={save} />
             <Button title="Cancel" kind="secondary" onPress={() => setDraft(null)} />

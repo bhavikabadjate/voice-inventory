@@ -14,6 +14,8 @@ export interface Product {
   /** Stock on hand, in `unit`. */
   stock: number;
   expiry?: string;
+  /** Warn when stock falls to this level. */
+  lowStockAt?: number;
 }
 
 export interface BillLine {

@@ -24,6 +24,12 @@ The product plan lives in the project files (`plans/voice-inventory-plan.md`).
   - Every change is confirmed with a yes/no before it's saved. Cost price is
     never spoken except while you're entering it.
 
+- **Bills**: any bill on the Ask tab can be sent as a PDF (WhatsApp or any app)
+  with the shop's name, the items, the total and a UPI QR code for that amount.
+- **Shop tab**: items expiring within 7 days and items running low (at or below a
+  level you set per product, or out of stock). Also by voice: "kya expire hone
+  wala hai", "kya khatam ho raha hai". Shop name, phone and UPI ID for bills.
+
 ## Run it
 
 Voice input uses `expo-speech-recognition`, which is not part of Expo Go, so the app

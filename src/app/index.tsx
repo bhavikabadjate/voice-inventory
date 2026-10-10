@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Accent, Button, Chip, Field } from '@/components/ui';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { alertCount, findAlerts } from '@/core/alerts';
 import { formatRupees } from '@/core/billing';
 import {
   awaitingYesNo,
@@ -24,7 +25,8 @@ import {
   type Turn,
 } from '@/core/conversation';
 import { unitLabel, type Lang } from '@/core/units';
-import { applyAction, todaysSalesPaise, useProducts } from '@/data/db';
+import { applyAction, getShop, todaysSalesPaise, useProducts } from '@/data/db';
+import { shareBill } from '@/data/share-bill';
 import { useTheme } from '@/hooks/use-theme';
 
 const LOCALES: Record<Lang, string> = { hi: 'hi-IN', mr: 'mr-IN', en: 'en-IN' };
@@ -46,10 +48,19 @@ const YES_NO: Record<Lang, [string, string]> = {
   en: ['Yes', 'No'],
 };
 
-const LABELS: Record<Lang, { confirmSale: string; today: string; total: string }> = {
-  hi: { confirmSale: 'बिक्री पक्की करें', today: 'आज की बिक्री', total: 'कुल' },
-  mr: { confirmSale: 'विक्री पक्की करा', today: 'आजची विक्री', total: 'एकूण' },
-  en: { confirmSale: 'Confirm sale', today: "Today's sales", total: 'Total' },
+const LABELS: Record<Lang, { confirmSale: string; share: string; today: string; total: string; attention: (n: number) => string }> = {
+  hi: {
+    confirmSale: 'बिक्री पक्की करें', share: 'बिल भेजें (WhatsApp)', today: 'आज की बिक्री', total: 'कुल',
+    attention: (n) => `⚠ ${n} सामान पर ध्यान दें। Shop टैब देखें।`,
+  },
+  mr: {
+    confirmSale: 'विक्री पक्की करा', share: 'बिल पाठवा (WhatsApp)', today: 'आजची विक्री', total: 'एकूण',
+    attention: (n) => `⚠ ${n} वस्तूंकडे लक्ष द्या. Shop टॅब पहा.`,
+  },
+  en: {
+    confirmSale: 'Confirm sale', share: 'Send bill (WhatsApp)', today: "Today's sales", total: 'Total',
+    attention: (n) => `⚠ ${n} items need attention. See the Shop tab.`,
+  },
 };
 
 export default function AskScreen() {
@@ -142,6 +153,16 @@ export default function AskScreen() {
   const replyLang = reply?.lang ?? lang;
   const bill = reply?.bill ?? null;
   const canConfirmSale = convo.flow.step === 'idle' && convo.lastBill !== null && bill === convo.lastBill;
+  const attention = alertCount(findAlerts(products, new Date()));
+
+  const sendBill = async () => {
+    if (!bill) return;
+    try {
+      await shareBill(await getShop(db), bill, replyLang);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not share the bill.');
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -155,6 +176,7 @@ export default function AskScreen() {
           <Text style={[styles.hint, { color: theme.textSecondary }]}>
             {LABELS[lang].today}: {formatRupees(todayPaise)}
           </Text>
+          {attention > 0 ? <Text style={styles.warning}>{LABELS[lang].attention(attention)}</Text> : null}
 
           <Pressable
             accessibilityRole="button"
@@ -215,6 +237,9 @@ export default function AskScreen() {
                   onPress={() => show(confirmLastBill(convoRef.current, productsRef.current))}
                 />
               ) : null}
+              {bill && !awaitingYesNo(convo) ? (
+                <Button title={LABELS[replyLang].share} kind="secondary" onPress={sendBill} />
+              ) : null}
             </View>
           ) : null}
 
@@ -264,6 +289,7 @@ const styles = StyleSheet.create({
   hint: { textAlign: 'center', fontSize: 14 },
   heard: { textAlign: 'center', fontSize: 18, fontStyle: 'italic' },
   error: { textAlign: 'center', color: '#D93F3F' },
+  warning: { textAlign: 'center', color: '#C77700', fontWeight: '600' },
   card: { padding: Spacing.three, borderRadius: 16, gap: Spacing.three },
   answer: { fontSize: 24, fontWeight: '700', textAlign: 'center' },
   bill: { gap: Spacing.two },
