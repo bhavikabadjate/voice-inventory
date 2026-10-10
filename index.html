@@ -1,0 +1,379 @@
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style><script>window.SEED=[{"id": "milk", "name": "Milk", "names": ["dudh", "दूध", "doodh", "Amul milk"], "unit": "L", "qty": 20, "cost": 48, "sell": 56, "low": 5, "expiry": "2026-10-14"}, {"id": "sugar", "name": "Sugar", "names": ["cheeni", "चीनी", "sakhar", "साखर", "shakkar"], "unit": "kg", "qty": 12, "cost": 39, "sell": 44, "low": 5, "expiry": ""}, {"id": "atta", "name": "Atta", "names": ["आटा", "wheat flour", "gehu atta", "kanik"], "unit": "kg", "qty": 30, "cost": 36, "sell": 42, "low": 10, "expiry": ""}, {"id": "ragi", "name": "Ragi", "names": ["nachni", "नाचणी", "रागी", "finger millet"], "unit": "kg", "qty": 8, "cost": 68, "sell": 80, "low": 3, "expiry": ""}, {"id": "parleg", "name": "Parle-G", "names": ["parle g", "पारले जी", "biscuit"], "unit": "packet", "qty": 40, "cost": 8.5, "sell": 10, "low": 12, "expiry": ""}, {"id": "oil", "name": "Sunflower Oil", "names": ["tel", "तेल", "oil"], "unit": "L", "qty": 4, "cost": 138, "sell": 150, "low": 5, "expiry": ""}, {"id": "haldi", "name": "Haldi", "names": ["हल्दी", "halad", "हळद", "turmeric"], "unit": "kg", "qty": 2.5, "cost": 210, "sell": 260, "low": 1, "expiry": ""}]</script></head><body>
+<title>Bolo Dukaan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Hind:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width column like a counter slate. Header, three tabs, a talk thread with the bill pinned above the composer. */
+:root{
+  --bg:#eef3ee; --surface:#ffffff; --ink:#16241d; --muted:#5d6f65; --line:#d3ded6;
+  --accent:#0f6b4f; --on-accent:#ffffff; --haldi:#e9b320; --haldi-soft:#fbf0c9; --warn:#b3401e; --me:#dcefe5;
+  --display:"Baloo 2","Hind",system-ui,sans-serif; --body:"Hind",system-ui,"Noto Sans Devanagari",sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1713; --surface:#18231d; --ink:#e7efe9; --muted:#93a69b; --line:#2a3a31;
+  --accent:#3fbf93; --on-accent:#06150f; --haldi:#e9b320; --haldi-soft:#3a3113; --warn:#ff8f6b; --me:#1f3a2e; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1713; --surface:#18231d; --ink:#e7efe9; --muted:#93a69b; --line:#2a3a31;
+  --accent:#3fbf93; --on-accent:#06150f; --haldi:#e9b320; --haldi-soft:#3a3113; --warn:#ff8f6b; --me:#1f3a2e; color-scheme:dark }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);padding-inline:16px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--haldi);outline-offset:2px}
+.app{max-width:520px;margin:0 auto;height:100%;display:flex;flex-direction:column;gap:10px;padding-block:12px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font:700 1.7rem/1 var(--display);margin:0;color:var(--accent)}
+h1 span{color:var(--haldi)}
+.status{font-size:.8rem;color:var(--muted)}
+.tabs{display:flex;gap:6px;border-bottom:2px solid var(--line)}
+.tabs button{background:none;border:0;padding:8px 12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--haldi)}
+.pane{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.thread{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-block:4px}
+.msg{max-width:86%;padding:9px 13px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.bot{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start}
+.msg.me{background:var(--me);border-bottom-right-radius:4px;align-self:flex-end}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip,.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-weight:600}
+.btn.go{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.bill{background:var(--haldi-soft);border:1px dashed var(--haldi);border-radius:10px;padding:10px 12px}
+.bill h2,.pane h2{font:600 1rem var(--display);margin:0 0 4px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{padding:3px 4px;text-align:left}
+td.n,th.n{text-align:right}
+.bill tfoot td{border-top:1px solid var(--haldi);font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.composer{display:flex;gap:8px}
+.composer input{flex:1;min-width:0;padding:9px 14px;font-size:.95rem;border-radius:999px;border:1.5px solid var(--line);background:var(--surface)}
+.dock{display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:4px}
+.mic{width:88px;height:88px;border-radius:50%;border:0;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;box-shadow:0 0 0 8px color-mix(in srgb,var(--accent) 16%,transparent);transition:transform .15s}
+.mic:active{transform:scale(.94)}
+.mic.on{background:var(--warn);color:var(--surface);box-shadow:0 0 0 8px color-mix(in srgb,var(--warn) 22%,transparent);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 18px color-mix(in srgb,var(--warn) 8%,transparent)}}
+@media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
+.micLabel{margin:6px 0 0;font:600 1rem var(--display);color:var(--muted)}
+.msg.bot.latest{font-size:1.25rem;font-weight:500;line-height:1.35;border-color:var(--accent);max-width:100%}
+.msg.bot.latest .chip,.msg.bot.latest .btn{font-size:1rem;padding:9px 18px}
+.hint{font-size:.8rem;color:var(--muted);margin:0}
+.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 2px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;width:100%}
+.item b{font-weight:600}
+.item small{color:var(--muted);grid-column:1;min-width:0;overflow-wrap:anywhere}
+.item .p{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.pill{display:inline-block;font-size:.72rem;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+.form{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form label{display:flex;flex-direction:column;font-size:.78rem;color:var(--muted);gap:2px;min-width:0}
+.form label.w{grid-column:1/-1}
+.form input,.form select{padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);min-width:0;width:100%}
+.empty{color:var(--muted);padding:20px 0}
+a{color:var(--accent)}
+</style>
+<div class="app">
+  <header>
+    <h1>Bolo <span>Dukaan</span></h1>
+    <div class="row">
+      <span class="status" id="status">Connecting…</span>
+      <label class="status"><input type="checkbox" id="speakOn"> Speak</label>
+      <label class="status"><input type="checkbox" id="costOn"> Show cost</label>
+    </div>
+  </header>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="talk" aria-selected="true">Assistant</button>
+    <button role="tab" data-tab="stock" aria-selected="false">Stock</button>
+    <button role="tab" data-tab="sales" aria-selected="false">Sales</button>
+  </div>
+
+  <section class="pane" id="pane-talk">
+    <div class="thread" id="thread" aria-live="polite"></div>
+    <div class="bill" id="bill" hidden></div>
+    <p class="hint" id="speakNote" style="color:var(--warn);text-align:center"></p>
+    <div class="dock">
+      <button class="mic" type="button" id="mic" aria-label="Tap and speak"><svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11Z"/></svg></button>
+      <p class="micLabel" id="micLabel">Tap karke bolo</p>
+    </div>
+    <form class="composer" id="composer">
+      <input id="say" autocomplete="off" placeholder="Ya yahan likho: 2 litre dudh kitne ka hai?" aria-label="Message">
+      <button class="btn go" type="submit">Send</button>
+    </form>
+  </section>
+
+  <section class="pane" id="pane-stock" hidden>
+    <div class="row"><button class="btn go" id="newBtn">Add product</button><span class="status" id="alerts"></span></div>
+    <form class="form" id="edit" hidden>
+      <label class="w">Name<input id="f-name" required></label>
+      <label class="w">Other names, comma separated<input id="f-names" placeholder="dudh, दूध, doodh"></label>
+      <label>Unit<select id="f-unit"><option value="L">litre</option><option value="kg">kg</option><option value="pc">piece</option><option value="packet">packet</option></select></label>
+      <label>Quantity in stock<input id="f-qty" type="number" step="any" min="0"></label>
+      <label>Selling price ₹<input id="f-sell" type="number" step="any" min="0" required></label>
+      <label id="f-cost-l">Cost price ₹<input id="f-cost" type="number" step="any" min="0"></label>
+      <label>Low-stock alert at<input id="f-low" type="number" step="any" min="0"></label>
+      <label>Expiry date<input id="f-exp" type="date"></label>
+      <div class="row w" style="grid-column:1/-1"><button class="btn go" type="submit">Save</button><button class="btn" type="button" id="f-cancel">Cancel</button><button class="btn" type="button" id="f-del" style="color:var(--warn)">Delete</button></div>
+    </form>
+    <div class="list" id="stockList"></div>
+  </section>
+
+  <section class="pane" id="pane-sales" hidden>
+    <h2 id="salesHead">Sales</h2>
+    <div class="list" id="salesList"></div>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const S={products:[],sales:[],bill:[],pending:null,lang:'hi',editing:null};
+let db=null,sample=null;
+const UL={L:'litre',kg:'kg',pc:'piece',packet:'packet'};
+const fm=x=>'₹'+(Math.round(x*100)/100).toLocaleString('en-IN');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function fq(q,u){q=Math.round(q*1000)/1000;
+  if(u==='L'&&q<1)return Math.round(q*1000)+' ml'; if(u==='kg'&&q<1)return Math.round(q*1000)+' gram';
+  return q+' '+UL[u]}
+
+/* ---------- name normalising: Devanagari to Latin, then a sound key ---------- */
+const DV={'अ':'a','आ':'a','इ':'i','ई':'i','उ':'u','ऊ':'u','ए':'e','ऐ':'ai','ओ':'o','औ':'au','ऋ':'ri',
+ 'ा':'a','ि':'i','ी':'i','ु':'u','ू':'u','े':'e','ै':'ai','ो':'o','ौ':'au','ृ':'ri','ॉ':'o','ॅ':'e','ऑ':'o',
+ 'क':'k','ख':'kh','ग':'g','घ':'gh','च':'c','छ':'ch','ज':'j','झ':'jh','ट':'t','ठ':'th','ड':'d','ढ':'dh','ण':'n',
+ 'त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'ph','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l',
+ 'व':'v','श':'sh','ष':'sh','स':'s','ह':'h','ळ':'l','ङ':'n','ञ':'n'};
+const MATRA='ािीुूेैोौृॉॅ्';
+function translit(s){let o='';for(let i=0;i<s.length;i++){const c=s[i];
+  if(c>='ऀ'&&c<='ॿ'){const t=DV[c];if(t===undefined)continue;o+=t;
+    if(c>='क'&&c<='ह'||c==='ळ'){const n=s[i+1];if(n&&n>='\u0900'&&n<='\u097f'&&!MATRA.includes(n))o+='a'}}
+  else o+=c}return o}
+function key2(s){return translit(String(s).toLowerCase()).replace(/[^a-z0-9]/g,'')
+  .replace(/ee/g,'i').replace(/oo/g,'u').replace(/chh|ch/g,'c').replace(/sh/g,'s').replace(/f/g,'p')
+  .replace(/([bdtkgjp])h/g,'$1').replace(/w/g,'v').replace(/z/g,'j').replace(/(.)\1+/g,'$1')}
+function key(s){return key2(s).replace(/a/g,'').replace(/(.)\1+/g,'$1')}
+/* Word lists match on the exact sound key; the looser no-vowel key only counts for words of 3+ letters. */
+const K=list=>{const s=new Set();list.split(' ').forEach(w=>{s.add(key2(w));const k=key(w);if(k.length>=3)s.add(k)});return s};
+const inS=(set,t)=>set.has(t.k2)||(t.k.length>=3&&set.has(t.k));
+const NUM={};[['ek one',1],['do don two',2],['teen tin three',3],['char four',4],['paanch panch pach five',5],['chhe saha six छह छे',6],
+ ['saat seven',7],['aath eight',8],['nau nine',9],['das daha ten',10],['gyarah',11],['barah bara',12],['pandrah',15],['bees vees',20],
+ ['pachees',25],['tees',30],['chalis',40],['pachas',50],['sau',100],['aadha adha ardha half',.5],['dedh',1.5],['dhai adich',2.5],['pav paav',.25],['sawa',1.25]]
+ .forEach(([w,n])=>w.split(' ').forEach(x=>NUM[key2(x)]=n));
+const UNIT={};[['litre liter litr ltr l litres lit लीटर लिटर','l'],['ml','ml'],['kg kilo kilogram kilos किलो','kg'],['gram grams gm g ग्राम','g'],
+ ['piece pieces pcs pc nag','pc'],['packet packets pkt pudi पैकेट पाकीट','packet'],['dozen darjan दर्जन','dozen']]
+ .forEach(([w,u])=>w.split(' ').forEach(x=>UNIT[key2(x)]=u));
+const W={SELL:K('becha bech bechi beche bechdiya sold sell vikla vikli vikle'),STOCK:K('bacha bachi bache stock shillak left remaining स्टॉक शिल्लक'),
+ ADD:K('add aaya aayi aaye jodo jod naya new ala aala'),COST:K('liya kharid kharida kharidi cost ghetla'),SELLP:K('bechna bechenge selling mrp vikaycha'),
+ RATE:K('rate price bhav daam kimat'),KAR:K('kar karo kara set kardo badal change'),BILL:K('bill'),PAKKA:K('pakka confirm final done'),
+ REMOVE:K('hata hatao hatado remove kadha kadh'),EXPIRE:K('expire expiry expired'),ALIAS:K('bolte kehte mhantat called'),
+ KITNA:K('kitna kitne kitni kiti how'),YES:K('haan ha yes ho hoy ok okay theek thik save sahi y'),NO:K('nahi nako no cancel mat n nahin'),
+ SEP:K('aur and ani plus'),HI:K('kitna kitne kitni kiti ka ki hai karo becha bacha bachi aur hata haan nahi ahe ko mein'),
+ STOP:K('ka ki ke hai hain mein me ko se liya aur and ani rs rupaye rupees rupay please the of much is what bhi item product kya total hua huwa per ek a for to in at de dena chahiye ahe che la update my mera of')};
+function lev(a,b){if(Math.abs(a.length-b.length)>1)return 2;const d=[...Array(b.length+1).keys()];
+  for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
+
+function tokenize(text){
+  let s=text.toLowerCase().replace(/[०-९]/g,c=>'०१२३४५६७८९'.indexOf(c)).replace(/[?!।₹"']/g,' ').replace(/[,+;]/g,' , ')
+    .replace(/(\d)([^\d\s.])/g,'$1 $2').replace(/([^\d\s.])(\d)/g,'$1 $2').replace(/\.(\s|$)/g,' ');
+  const raw=s.split(/\s+/).filter(Boolean);
+  const toks=raw.map(r=>{const k=key(r),k2=key2(r);return{raw:r,k,k2,num:/^\d+(\.\d+)?$/.test(r)?parseFloat(r):(r==='at'?undefined:NUM[k2])}});
+  toks.forEach((t,i)=>{const p=toks[i-1];
+    if(t.k2==='do'&&p&&(inS(W.KAR,p)||inS(W.REMOVE,p)||p.k2==='de'))t.num=undefined;
+    t.unit=t.num===undefined?UNIT[t.k2]:undefined;t.sep=t.raw===','||inS(W.SEP,t)});
+  return toks}
+
+function nameIndex(){const m=new Map();for(const p of S.products)for(const n of [p.name,...(p.names||[])]){const k=key(n);if(!k)continue;
+  if(!m.has(k))m.set(k,[]);m.get(k).push({id:p.id,k2:key2(n)})}return m}
+/* Finds products, quantities and units in a sentence. */
+function parseItems(toks){const idx=nameIndex(),items=[],used=new Set();let amb=null,cur={p:null,qty:null,unit:null};
+  const flush=()=>{if(cur.p)items.push(cur);else if(cur.qty!=null&&items.length&&items[items.length-1].qty==null){const l=items[items.length-1];l.qty=cur.qty;l.unit=cur.unit}
+    else if(cur.qty!=null)items.loose=cur;cur={p:null,qty:null,unit:null}};
+  for(let i=0;i<toks.length;i++){const t=toks[i];
+    if(t.sep){flush();continue}
+    if(t.num!==undefined){if(cur.p&&cur.qty!=null)flush();if(cur.qty==null)cur.qty=t.num;used.add(i);continue}
+    if(t.unit){if(!cur.unit)cur.unit=t.unit;used.add(i);continue}
+    let hit=null,n=0;
+    for(n=3;n>=1&&!hit;n--){if(i+n>toks.length)continue;const sl=toks.slice(i,i+n),k=sl.map(x=>x.k).join(''),k2=sl.map(x=>x.k2).join('');
+      const m=(idx.get(k)||[]).filter(e=>k.length>=3||e.k2===k2);if(m.length){hit=new Set(m.map(e=>e.id));break}}
+    if(!hit&&t.k.length>=4&&!Object.values(W).some(s=>inS(s,t))){for(const [k,es] of idx)if(k.length>=4&&lev(k,t.k)<=1){hit=new Set(es.map(e=>e.id));n=1;break}}
+    if(hit){if(hit.size>1){amb=[...hit];}
+      if(cur.p)flush();cur.p=S.products.find(p=>p.id===[...hit][0]);for(let j=i;j<i+n;j++)used.add(j);i+=n-1}}
+  flush();return{items,amb,used,loose:items.loose}}
+function toBase(q,u,p){if(q==null)q=1;if(!u)return q;const b=p.unit;
+  const T={L:{l:1,ml:.001},kg:{kg:1,g:.001},pc:{pc:1,dozen:12},packet:{packet:1,pc:1,dozen:12}}[b]||{};return T[u]!==undefined?q*T[u]:null}
+const baseOf=u=>({l:'L',ml:'L',kg:'kg',g:'kg',pc:'pc',dozen:'pc',packet:'packet'}[u]||'pc');
+
+/* ---------- storage ---------- */
+function persist(){if(db)return;try{localStorage.setItem('shop',JSON.stringify({products:S.products,sales:S.sales}))}catch(e){}}
+function saveProduct(p){const i=S.products.findIndex(x=>x.id===p.id);if(i<0)S.products.push(p);else S.products[i]=p;renderAll();persist();
+  if(db){const {id,...d}=p;db.collection('products').doc(id).set(d).catch(e=>say('Save failed: '+(e.message||e.code)+'. Check your connection and try again.'))}}
+function deleteProduct(id){S.products=S.products.filter(p=>p.id!==id);renderAll();persist();if(db)db.collection('products').doc(id).delete().catch(()=>{})}
+function recordSale(lines){const total=Math.round(lines.reduce((a,l)=>a+l.amount,0));
+  for(const l of lines){const p=S.products.find(x=>x.id===l.id);if(p)saveProduct({...p,qty:Math.max(0,Math.round((p.qty-l.qty)*1000)/1000)})}
+  const sale={items:lines.map(l=>({name:l.name,qty:l.qty,unit:l.unit,rate:l.rate,amount:l.amount})),total,at:Date.now()};
+  if(db)db.collection('sales').add(sale).catch(()=>{});else{S.sales.unshift(sale);renderSales();persist()}
+  return total}
+
+/* ---------- conversation ---------- */
+const t=(hi,en)=>S.lang==='en'?en:hi;
+function say(text,chips,spoken){const d=document.createElement('div');d.className='msg bot';d.textContent=text;
+  if(chips){const c=document.createElement('div');c.className='chips';chips.forEach(([label,send,go])=>{const b=document.createElement('button');b.type='button';b.className=go?'btn go':'chip';b.textContent=label;b.onclick=()=>handle(send);c.append(b)});d.append(c)}
+  document.querySelectorAll('.msg.latest').forEach(x=>x.classList.remove('latest'));d.classList.add('latest');$('thread').append(d);$('thread').scrollTop=1e9;
+  if($('speakOn').checked)speak(spoken||text)}
+let voices=[];
+function loadVoices(){try{voices=speechSynthesis.getVoices()||[]}catch(e){}}
+if('speechSynthesis' in window){loadVoices();try{speechSynthesis.onvoiceschanged=loadVoices}catch(e){}}
+function speak(text){const st=$('speakNote');
+  if(!('speechSynthesis' in window)){st.textContent='This browser cannot speak. Open the page in Chrome or Safari.';return}
+  try{loadVoices();const want=S.lang==='en'?['en-in','en']:['hi','mr','en-in','en'];let v=null;
+    for(const w of want){v=voices.find(x=>x.lang.toLowerCase().replace('_','-').startsWith(w));if(v)break}
+    const u=new SpeechSynthesisUtterance(text.replace(/₹\s*/g,' rupaye ').replace(/\//g,' per '));
+    if(v){u.voice=v;u.lang=v.lang}else u.lang='en-IN';
+    u.onstart=()=>{st.textContent=''};
+    u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')st.textContent='Sound is blocked here ('+e.error+'). Open the page in its own browser tab and check the phone is not on silent.'};
+    const go=()=>{try{speechSynthesis.resume();speechSynthesis.speak(u)}catch(e){}};
+    if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(go,120)}else go();
+  }catch(e){st.textContent='Could not speak: '+e.message}}
+function me(text){const d=document.createElement('div');d.className='msg me';d.textContent=text;$('thread').append(d)}
+const YN=()=>[[t('Haan','Yes'),'haan',1],[t('Nahi','No'),'nahi']];
+function confirmAsk(text,run){S.pending={type:'confirm',run};say(text,YN())}
+function linesOf(items){const out=[];for(const it of items){const q=toBase(it.qty,it.unit,it.p);
+  if(q==null){say(t(`${it.p.name} ${UL[it.p.unit]} mein bikta hai. Kitna ${UL[it.p.unit]}?`,`${it.p.name} is sold by the ${UL[it.p.unit]}. How many ${UL[it.p.unit]}?`));return null}
+  out.push({id:it.p.id,name:it.p.name,qty:q,unit:it.p.unit,rate:it.p.sell,amount:Math.round(q*it.p.sell*100)/100})}return out}
+
+async function handle(text,fromAI){text=text.trim();if(!text)return;if(!fromAI)me(text);
+  const toks=tokenize(text),has=s=>toks.some(x=>inS(s,x));
+  const words=toks.filter(x=>x.num===undefined&&!x.unit&&!x.sep);
+  if(words.length>=2||!S.pending)S.lang=(/[ऀ-ॿ]/.test(text)||has(W.HI))?'hi':(words.length?'en':S.lang);
+  if(S.pending&&pendingStep(toks,text,has))return;
+  if(has(W.BILL)&&has(W.PAKKA))return confirmBill();
+  if(has(W.EXPIRE))return expiryList();
+  const R=parseItems(toks),items=R.items;
+  if(R.amb){const ps=R.amb.map(id=>S.products.find(p=>p.id===id));return say(t('Kaunsa?','Which one?'),ps.map(p=>[p.name,text+' '+p.name]))}
+  const left=toks.filter((x,i)=>!R.used.has(i)&&x.num===undefined&&!x.unit&&!x.sep&&!inS(W.STOP,x)&&!['ADD','COST','SELLP','ALIAS','KAR','RATE','STOCK','SELL','KITNA'].some(n=>inS(W[n],x)));
+  if(has(W.ALIAS)&&items.length===1&&left.length){const nm=left.map(x=>x.raw).join(' '),p=items[0].p;
+    return confirmAsk(t(`"${nm}" ko ${p.name} ka naam save karun?`,`Save "${nm}" as a name for ${p.name}?`),()=>{saveProduct({...p,names:[...(p.names||[]),nm]});say(t('Naam jud gaya.','Name added.'))})}
+  if(has(W.ADD)||has(W.COST))return startAdd(toks,R,left);
+  if(has(W.REMOVE)&&items.length){S.bill=S.bill.filter(l=>!items.some(i=>i.p.id===l.id));renderBill();return say(t(items[0].p.name+' bill se hata diya.','Removed '+items[0].p.name+' from the bill.'))}
+  if(has(W.RATE)&&has(W.KAR)&&items.length===1&&items[0].qty!=null){const p=items[0].p,v=items[0].qty;
+    return confirmAsk(t(`${p.name} ka rate ${fm(p.sell)} se ${fm(v)} karun?`,`Change ${p.name} from ${fm(p.sell)} to ${fm(v)}?`),()=>{saveProduct({...p,sell:v,history:[...(p.history||[]),{from:p.sell,to:v,at:Date.now()}]});say(t(`${p.name} ab ${fm(v)} per ${UL[p.unit]}.`,`${p.name} is now ${fm(v)} per ${UL[p.unit]}.`))})}
+  if(has(W.SELL)&&items.length){const lines=linesOf(items);if(!lines)return;const tot=Math.round(lines.reduce((a,l)=>a+l.amount,0));
+    return confirmAsk(t(`${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} becha, ${fm(tot)}. Save karun?`,`Sold ${lines.map(l=>fq(l.qty,l.unit)+' '+l.name).join(', ')} for ${fm(tot)}. Save it?`),()=>{recordSale(lines);say(t('Sale save ho gayi, stock kam kar diya.','Sale saved and stock lowered.'))})}
+  if(has(W.STOCK)&&items.length){const it=items[0],p=it.p;
+    if(it.qty!=null&&!has(W.KITNA)){const q=toBase(it.qty,it.unit,p);if(q!=null)return confirmAsk(t(`${p.name} ka stock ${fq(q,p.unit)} set karun?`,`Set ${p.name} stock to ${fq(q,p.unit)}?`),()=>{saveProduct({...p,qty:q});say(t('Stock theek kar diya.','Stock corrected.'))})}
+    return say(items.map(i=>`${i.p.name}: ${fq(i.p.qty,i.p.unit)} ${t('bacha hai','left')}`).join('\n'))}
+  if(!items.length&&has(W.STOCK))return say(t('Kis cheez ka stock? Aise bolo: "sugar ka stock 25 kilo hai" ya "10 litre milk aaya".','Stock of what? Say "set sugar stock to 25 kg" or "add 10 litre milk".'));
+  if(!items.length){
+    if(sample&&!fromAI&&S.products.length){try{const r=await sample(`A shopkeeper said (Hindi/Marathi/English, maybe misheard): "${text}"\nShop products: ${S.products.map(p=>p.name).join(', ')}\nRewrite it as ONE line in exactly one of these forms, using product names exactly as listed:\nprice <qty> <unit> <Product> [and <qty> <unit> <Product> ...]\nsold <qty> <unit> <Product>\nstock <Product>\nrate <Product> <number> set\nadd <Product> <qty> <unit>\nIf nothing fits reply: unknown\nReply with the line only.`,{modelTier:'quick'});
+        const line=(r.text||'').trim().split('\n')[0];if(line&&!/^unknown/i.test(line)){const l=S.lang;await handle(line.replace(/^price\s+/i,''),true);S.lang=l;return}}catch(e){}}
+    return say(t('Samajh nahi aaya. Aise bolo: "2 litre dudh kitne ka hai?", "cheeni add karo", "1 kilo sugar becha".','I did not catch that. Try: "price of 2 litre milk", "add sugar", "sold 1 kg sugar".'))}
+  const lines=linesOf(items);if(!lines)return;
+  const append=toks[0].sep&&S.bill.length;
+  if(lines.length===1&&!append){const l=lines[0],one=items[0].qty==null&&!items[0].unit;
+    return say(one?`${l.name} ${fm(l.rate)} per ${UL[l.unit]}`:`${fq(l.qty,l.unit)} ${l.name} ${fm(l.amount)} (${fm(l.rate)} per ${UL[l.unit]})`)}
+  S.bill=append?[...S.bill,...lines]:lines;renderBill();
+  say(S.bill.map(l=>`${l.name} ${fm(l.amount)}`).join(', ')+`, total ${fm(billTotal())}`)}
+
+function startAdd(toks,R,left){const it=R.items[0];const a={type:'add',p:it?it.p:null,name:it?null:left.map(x=>x.raw).join(' ')||null,qty:null,unit:null,cost:null,sell:null,exp:it?null:undefined};
+  const nr=(i,set,d)=>[d,2*d].some(o=>toks[i+o]&&inS(set,toks[i+o]));
+  const src=it||R.loose;let first=true;
+  toks.forEach((x,i)=>{if(x.num===undefined)return;
+    const isQ=first&&toks[i+1]&&toks[i+1].unit,sl=d=>nr(i,W.SELLP,d)||nr(i,W.SELL,d);
+    if(!isQ&&nr(i,W.COST,1))a.cost=x.num;else if(!isQ&&sl(1))a.sell=x.num;else if(!isQ&&nr(i,W.COST,-1))a.cost=x.num;else if(!isQ&&sl(-1))a.sell=x.num;
+    else if(first){a.qty=x.num;a.unit=(toks[i+1]&&toks[i+1].unit)||(src&&src.unit)||null}first=false});
+  S.pending=a;advanceAdd()}
+function advanceAdd(){const a=S.pending;
+  if(!a.p&&!a.name){a.step='name';return say(t('Kaunsa product?','Which product?'))}
+  if(a.qty==null){a.step='qty';return say(a.p?t(`${a.p.name} already hai, ${fm(a.p.sell)} per ${UL[a.p.unit]}. Kitna aaya?`,`${a.p.name} exists at ${fm(a.p.sell)} per ${UL[a.p.unit]}. How much came in?`):t('Kitna aaya? (jaise 20 litre)','How much? (e.g. 20 litre)'))}
+  if(!a.p&&a.cost==null){a.step='cost';return say(t('Kharid ka rate kya hai?','Cost price?'))}
+  if(a.sell==null){if(a.p){a.step='sellkeep';return say(t(`Selling price ${fm(a.p.sell)} hi rahega?`,`Keep the selling price at ${fm(a.p.sell)}?`),YN())}a.step='sell';return say(t('Bechne ka rate?','Selling price?'))}
+  if(a.exp===undefined){a.step='exp';return say(t('Expiry date batani hai? (jaise 14 Oct, ya nahi)','Expiry date? (e.g. 14 Oct, or no)'),[[t('Nahi','No'),'nahi']])}
+  a.step='confirm';const nm=a.p?a.p.name:a.name,u=a.p?a.p.unit:baseOf(a.unit),q=a.p?toBase(a.qty,a.unit,a.p):toBase(a.qty,a.unit,{unit:u});
+  if(q==null){a.qty=null;return advanceAdd()}a.q=q;a.u=u;
+  const sp=`${nm}, ${fq(q,u)}, selling ${fm(a.sell)}${a.exp?', expiry '+a.exp:''}. ${t('Save karun?','Save it?')}`;
+  say(sp+($('costOn').checked&&a.cost!=null?`\n(cost ${fm(a.cost)})`:''),YN(),sp)}
+function parseDate(text){const iso=text.match(/\d{4}-\d{2}-\d{2}/);if(iso)return iso[0];
+  const m=text.toLowerCase().match(/(\d{1,2})\s*([a-z]{3})/);if(!m)return null;const mi='janfebmaraprmayjunjulaugsepoctnovdec'.indexOf(m[2])/3;if(mi<0||mi%1)return null;
+  const now=new Date();let y=now.getFullYear();if(new Date(y,mi,+m[1]+1)<now)y++;return `${y}-${String(mi+1).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`}
+function pendingStep(toks,text,has){const a=S.pending,num=(toks.find(x=>x.num!==undefined)||{}).num,yes=has(W.YES),no=has(W.NO);
+  if(toks.some(x=>x.k2==='cancel')){S.pending=null;say(t('Theek hai, cancel.','Okay, cancelled.'));return true}
+  if(a.type==='confirm'){if(yes){S.pending=null;a.run();return true}if(no){S.pending=null;say(t('Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}S.pending=null;return false}
+  switch(a.step){
+    case'name':a.name=text;break;
+    case'qty':if(num===undefined){say(t('Number batao, jaise 10 litre.','Give a number, e.g. 10 litre.'));return true}a.qty=num;a.unit=(toks.find(x=>x.unit)||{}).unit||null;break;
+    case'cost':if(num===undefined){say(t('Rate number mein batao.','Give the price as a number.'));return true}a.cost=num;break;
+    case'sell':if(num===undefined){say(t('Rate number mein batao.','Give the price as a number.'));return true}a.sell=num;break;
+    case'sellkeep':if(num!==undefined)a.sell=num;else if(yes)a.sell=a.p.sell;else{a.step='sell';say(t('Naya selling rate?','New selling price?'));return true}break;
+    case'exp':if(no)a.exp=null;else{const d=parseDate(text);if(!d){say(t('Date samajh nahi aayi. "14 Oct" jaise bolo, ya "nahi".','I could not read that date. Say it like "14 Oct", or "no".'));return true}a.exp=d}break;
+    case'confirm':S.pending=null;if(!yes){say(t('Theek hai, kuch save nahi kiya.','Okay, nothing saved.'));return true}
+      if(a.p){const p=S.products.find(x=>x.id===a.p.id)||a.p,n={...p,qty:Math.round((p.qty+a.q)*1000)/1000,sell:a.sell};if(a.exp)n.expiry=a.exp;
+        if(a.sell!==p.sell)n.history=[...(p.history||[]),{from:p.sell,to:a.sell,at:Date.now()}];saveProduct(n);say(t(`${p.name} ab ${fq(n.qty,n.unit)} hai.`,`${p.name} is now ${fq(n.qty,n.unit)}.`))}
+      else{saveProduct({id:'p'+Date.now().toString(36),name:a.name,names:[],unit:a.u,qty:a.q,cost:a.cost,sell:a.sell,low:0,expiry:a.exp||''});say(t(`${a.name} jud gaya. Stock tab mein aur naam jod sakte ho.`,`${a.name} added. You can add more names in the Stock tab.`))}
+      return true}
+  advanceAdd();return true}
+
+const billTotal=()=>Math.round(S.bill.reduce((a,l)=>a+l.amount,0));
+function confirmBill(){if(!S.bill.length)return say(t('Bill khali hai.','The bill is empty.'));const tot=recordSale(S.bill);S.bill=[];renderBill();say(t(`Bill pakka, total ${fm(tot)}. Stock kam kar diya.`,`Bill confirmed, total ${fm(tot)}. Stock lowered.`))}
+const daysTo=d=>Math.ceil((new Date(d)-Date.now())/864e5);
+function expiryList(){const l=S.products.filter(p=>p.expiry&&daysTo(p.expiry)<=7);
+  say(l.length?l.map(p=>`${p.name}: ${daysTo(p.expiry)<0?t('expire ho gaya','expired'):p.expiry}`).join('\n'):t('Is hafte kuch expire nahi ho raha.','Nothing expires this week.'))}
+
+/* ---------- rendering ---------- */
+function renderBill(){const b=$('bill');b.hidden=!S.bill.length;if(!S.bill.length)return;
+  const txt=S.bill.map(l=>`${l.name} ${fq(l.qty,l.unit)} = ${fm(l.amount)}`).join('\n')+`\nTotal ${fm(billTotal())}`;
+  b.innerHTML=`<h2>Bill</h2><table><tbody>${S.bill.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${fq(l.qty,l.unit)}</td><td class="n">${fm(l.rate)}/${UL[l.unit]}</td><td class="n">${fm(l.amount)}</td></tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="3">Total</td><td class="n">${fm(billTotal())}</td></tr></tfoot></table>
+  <div class="row" style="margin-top:8px"><button class="btn go" id="b-ok">Confirm sale</button><button class="btn" id="b-clear">Clear</button><a target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Share on WhatsApp</a></div>`;
+  $('b-ok').onclick=confirmBill;$('b-clear').onclick=()=>{S.bill=[];renderBill()}}
+function renderStock(){const cost=$('costOn').checked,ps=[...S.products].sort((a,b)=>a.name.localeCompare(b.name));
+  const low=ps.filter(p=>p.low&&p.qty<=p.low).length,exp=ps.filter(p=>p.expiry&&daysTo(p.expiry)<=7).length;
+  $('alerts').textContent=[low&&low+' low on stock',exp&&exp+' expiring within a week'].filter(Boolean).join(' · ');
+  $('stockList').innerHTML=ps.length?ps.map(p=>`<button class="item" data-id="${esc(p.id)}"><span><b>${esc(p.name)}</b>${p.low&&p.qty<=p.low?'<span class="pill">Low</span>':''}${p.expiry&&daysTo(p.expiry)<=7?`<span class="pill">${daysTo(p.expiry)<0?'Expired':'Expires '+esc(p.expiry)}</span>`:''}</span>
+   <span class="p">${fm(p.sell)}/${UL[p.unit]}</span><small>${esc((p.names||[]).join(', '))}</small><span class="p" style="font-weight:400">${fq(p.qty,p.unit)}${cost&&p.cost!=null?' · cost '+fm(p.cost):''}</span></button>`).join('')
+   :'<p class="empty">No products yet. Tap Add product, or tell the assistant "cheeni add karo".</p>'}
+function renderSales(){const today=new Date().toDateString(),tt=S.sales.filter(s=>new Date(s.at).toDateString()===today).reduce((a,s)=>a+s.total,0);
+  $('salesHead').textContent='Today: '+fm(tt);
+  $('salesList').innerHTML=S.sales.length?S.sales.map(s=>`<div class="item"><span>${esc(s.items.map(i=>fq(i.qty,i.unit)+' '+i.name).join(', '))}</span><span class="p">${fm(s.total)}</span><small>${new Date(s.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</small></div>`).join(''):'<p class="empty">Sales appear here after you confirm a bill or say "2 litre dudh becha".</p>'}
+function renderAll(){renderStock();renderSales()}
+
+function openEdit(p){S.editing=p?p.id:null;$('edit').hidden=false;$('f-cost-l').hidden=!$('costOn').checked;$('f-del').hidden=!p;p=p||{};
+  $('f-name').value=p.name||'';$('f-names').value=(p.names||[]).join(', ');$('f-unit').value=p.unit||'kg';$('f-qty').value=p.qty??'';$('f-sell').value=p.sell??'';$('f-cost').value=p.cost??'';$('f-low').value=p.low||'';$('f-exp').value=p.expiry||'';$('f-name').focus()}
+$('edit').onsubmit=e=>{e.preventDefault();const old=S.products.find(p=>p.id===S.editing)||{},n=id=>parseFloat($(id).value)||0,sell=n('f-sell');
+  const p={...old,id:old.id||'p'+Date.now().toString(36),name:$('f-name').value.trim(),names:$('f-names').value.split(',').map(s=>s.trim()).filter(Boolean),unit:$('f-unit').value,qty:n('f-qty'),sell,low:n('f-low'),expiry:$('f-exp').value};
+  if($('costOn').checked)p.cost=n('f-cost');else if(p.cost===undefined)p.cost=null;
+  if(old.id&&old.sell!==sell)p.history=[...(old.history||[]),{from:old.sell,to:sell,at:Date.now()}];
+  saveProduct(p);$('edit').hidden=true};
+$('f-cancel').onclick=()=>$('edit').hidden=true;
+$('f-del').onclick=()=>{if($('f-del').dataset.sure){deleteProduct(S.editing);$('edit').hidden=true;delete $('f-del').dataset.sure;$('f-del').textContent='Delete'}else{$('f-del').dataset.sure=1;$('f-del').textContent='Tap again to delete'}};
+$('newBtn').onclick=()=>openEdit(null);
+$('stockList').onclick=e=>{const b=e.target.closest('.item');if(b)openEdit(S.products.find(p=>p.id===b.dataset.id))};
+$('costOn').onchange=()=>{try{localStorage.setItem('cost',$('costOn').checked?1:'')}catch(e){}renderStock();$('f-cost-l').hidden=!$('costOn').checked};
+$('speakOn').onchange=()=>{try{localStorage.setItem('speak',$('speakOn').checked?1:'')}catch(e){}
+  if($('speakOn').checked)speak('Awaaz chalu hai');else{$('speakNote').textContent='';try{speechSynthesis.cancel()}catch(e){}}};
+try{$('costOn').checked=!!localStorage.getItem('cost');$('speakOn').checked=!!localStorage.getItem('speak')}catch(e){}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  ['talk','stock','sales'].forEach(n=>$('pane-'+n).hidden=n!==b.dataset.tab)});
+/* Mic button: uses the browser's speech recognition where the page is allowed the microphone; otherwise opens the keyboard so its mic key can be used. */
+let rec=null,listening=false;
+function micFallback(why){$('speakNote').textContent=why+' Tap the mic key on your keyboard instead, then Send.';$('say').focus()}
+$('mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(listening&&rec){try{rec.stop()}catch(e){}return}
+  if(!SR)return micFallback('This browser has no built-in voice typing.');
+  try{rec=new SR();rec.lang=S.lang==='en'?'en-IN':'hi-IN';rec.interimResults=true;rec.maxAlternatives=1;let fin='',got=false;
+    rec.onstart=()=>{listening=true;$('mic').classList.add('on');$('speakNote').textContent='';$('micLabel').textContent='Sun raha hoon…'};
+    rec.onresult=e=>{got=true;let t='';for(const r of e.results){t+=r[0].transcript;if(r.isFinal)fin=t}$('say').value=t};
+    rec.onerror=e=>{if(e.error==='no-speech')$('speakNote').textContent='Kuch sunai nahi diya. Dobara mic dabao.';
+      else if(e.error!=='aborted')micFallback(e.error==='not-allowed'||e.error==='service-not-allowed'?'The microphone is blocked for this page.':'Voice typing failed ('+e.error+').')};
+    rec.onend=()=>{listening=false;$('mic').classList.remove('on');$('micLabel').textContent='Tap karke bolo';
+      const v=(fin||(got?$('say').value:'')).trim();if(v){$('say').value='';handle(v)}};
+    rec.start()}catch(e){micFallback('The microphone could not start.')}};
+$('composer').onsubmit=e=>{e.preventDefault();const v=$('say').value;$('say').value='';handle(v)};
+
+renderAll();
+say('Namaste! Kuch bhi pucho ya batao.',[['Dudh kitne ka hai?','dudh kitne ka hai?'],['1 litre milk aur 2 kilo sugar','1 litre milk aur 2 kilo sugar ka kitna hua?'],['Cheeni kitni bachi hai?','cheeni kitni bachi hai?'],['Ragi add karo','ragi add karo']]);
+(async()=>{const c=window.claude;
+  try{db=c?await c.use('db'):null}catch(e){db=null}
+  try{sample=c?await c.use('sample'):null}catch(e){sample=null}
+  if(!db){let ok=false;try{const d=JSON.parse(localStorage.getItem('shop')||'null');if(d){S.products=d.products||[];S.sales=d.sales||[]}else if(window.SEED)S.products=window.SEED;localStorage.setItem('shop-ok','1');ok=true}catch(e){}
+    renderAll();$('status').textContent=ok?'Saved on this device':'Changes are not saved in this browser';return}
+  $('status').textContent='Saved to your shop';
+  const fail=e=>{$('status').textContent='Offline: '+(e.message||e.code)};
+  db.collection('products').onSnapshot(s=>{S.products=s.docs.map(d=>({id:d.id,...d.data()}));renderAll()},fail);
+  db.collection('sales').orderBy('at','desc').limit(100).onSnapshot(s=>{S.sales=s.docs.map(d=>d.data());renderSales()},fail);
+})();
+</script>
+
+</body></html>
